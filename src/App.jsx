@@ -40,7 +40,17 @@ export default function App() {
   const [savingProduct, setSavingProduct] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  useEffect(() => { loadCustomProducts(); }, []);
+  const [allCustomers, setAllCustomers] = useState([]);
+
+  useEffect(() => { loadCustomProducts(); loadAllCustomers(); }, []);
+
+  const loadAllCustomers = async () => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=name`, { headers: SB_HEADERS });
+      const data = await res.json();
+      if (Array.isArray(data)) setAllCustomers(data);
+    } catch (e) { console.error(e); }
+  };
 
   const loadCustomProducts = async () => {
     try {
@@ -111,21 +121,13 @@ export default function App() {
   // Recherche client fidélité : QR, téléphone ou nom
   const searchLoyaltyClient = async (query) => {
     if (!query.trim()) { setLoyaltyResults([]); return; }
-    setLoyaltySearching(true);
-    try {
-      // Cherche par name, phone, email
-      const q = query.trim();
-      const [r1, r2, r3] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/customers?name=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?phone=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?email=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
-      ]);
-      const [d1, d2, d3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
-      const all = [...(d1||[]), ...(d2||[]), ...(d3||[])];
-      const unique = all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-      setLoyaltyResults(unique);
-    } catch (e) { setLoyaltyResults([]); }
-    setLoyaltySearching(false);
+    const q = query.trim().toLowerCase();
+    const results = allCustomers.filter(c =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q))
+    );
+    setLoyaltyResults(results);
   };
 
   const selectLoyaltyClient = (client) => {
