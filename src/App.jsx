@@ -5,7 +5,7 @@ const TVA = 0.06;
 const CASHBACK_RATE = 0.05;
 const VRAC_PRICE_PER_100G = 1.50;
 const SUPABASE_URL = "https://swrpladhwaspibpoegwn.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3cnBsYWRod2FzcGlicG9lZ3duIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyMTA0NzIsImV4cCI6MjA1OTc4NjQ3Mn0.qFBHxEP2ueN4lRAhEWd1p5MpBhA8YiVGMDcXCiVE0oY";
+const SUPABASE_KEY = "sb_publishable_1m5yOZvVzFfXQQYqoN8h_A_nd56vaPI";
 const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" };
 
 const CATEGORY_EMOJIS = {
@@ -240,7 +240,7 @@ export default function App() {
           <input style={S.barcodeInput} placeholder="Code-barres..."
             value={barcodeInput} onChange={e => setBarcodeInput(e.target.value)} onKeyDown={handleBarcode} />
           <button style={S.btnVrac} onClick={() => setModal('vrac')}>⚖️ Vrac</button>
-          <button style={S.btnFidelite} onClick={() => { setModal('loyalty'); setLoyaltyResults([]); setQrInput(""); }}>💳 Fidélité</button>
+          <button style={S.btnFidelite} onClick={() => { setModal('loyalty'); setLoyaltyResults([]); setQrInput(""); loadAllCustomers(); }}>💳 Fidélité</button>
           <button style={S.btnSettings} onClick={() => setShowSettings(true)}>⚙️</button>
         </div>
       </div>
@@ -426,6 +426,9 @@ export default function App() {
           <div style={{ ...S.modalBox, width:460 }}>
             <h2 style={S.modalTitle}>💳 Carte fidélité client</h2>
             <p style={S.modalSub}>Scannez le QR, ou tapez un numéro de téléphone / nom</p>
+            <p style={{ color: allCustomers.length > 0 ? '#4caf50' : '#ff5555', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
+              {allCustomers.length > 0 ? `✅ ${allCustomers.length} clients chargés` : '⏳ Chargement des clients...'}
+            </p>
             <div style={{ display:'flex', gap:8, marginBottom:12 }}>
               <input style={{ ...S.loyaltyInput, flex:1, marginBottom:0 }}
                 placeholder="QR code, téléphone ou nom..."
