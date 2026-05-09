@@ -113,15 +113,14 @@ export default function App() {
     if (!query.trim()) { setLoyaltyResults([]); return; }
     setLoyaltySearching(true);
     try {
-      // Cherche par qr_code, phone, first_name, last_name
-      const [r1, r2, r3, r4] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/customers?qr_code=eq.${encodeURIComponent(query)}&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?phone=like.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?first_name=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?last_name=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
+      // Cherche par name, phone, email
+      const [r1, r2, r3] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/customers?name=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/customers?phone=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/customers?email=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
       ]);
-      const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()]);
-      const all = [...(d1||[]), ...(d2||[]), ...(d3||[]), ...(d4||[])];
+      const [d1, d2, d3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
+      const all = [...(d1||[]), ...(d2||[]), ...(d3||[])];
       const unique = all.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
       setLoyaltyResults(unique);
     } catch (e) { setLoyaltyResults([]); }
@@ -270,7 +269,7 @@ export default function App() {
         <div style={S.right}>
           <div style={S.cartHeader}>
             🛒 CAISSE
-            {loyaltyClient && <div style={S.loyaltyBadge}>💳 {loyaltyClient.first_name} {loyaltyClient.last_name || ''} — {(loyaltyClient.cagnotte||0).toFixed(2)}€</div>}
+            {loyaltyClient && <div style={S.loyaltyBadge}>💳 {loyaltyClient.name} — {(loyaltyClient.cagnotte||0).toFixed(2)}€</div>}
           </div>
           <div style={S.cartItems}>
             {cart.length === 0 && <div style={S.emptyCart}>Aucun article</div>}
@@ -438,7 +437,7 @@ export default function App() {
               <div style={{ maxHeight:200, overflowY:'auto', marginBottom:16, display:'flex', flexDirection:'column', gap:6 }}>
                 {loyaltyResults.map(client => (
                   <button key={client.id} style={S.clientResult} onClick={() => selectLoyaltyClient(client)}>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{client.first_name} {client.last_name || ''}</div>
+                    <div style={{ fontWeight:700, fontSize:14 }}>{client.name}</div>
                     <div style={{ fontSize:12, color:'#aaa' }}>{client.phone || client.email || ''} · 💰 {(client.cagnotte||0).toFixed(2)}€</div>
                   </button>
                 ))}
@@ -497,7 +496,7 @@ export default function App() {
                 <>
                   <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
                   <div style={{ ...S.receiptLine, color:'#e91e8c' }}><span>💳 Cashback +5%</span><span>+{receiptData.cashbackEarned.toFixed(2)}€</span></div>
-                  <div style={S.receiptLine}><span>Client</span><span>{receiptData.client.first_name} {receiptData.client.last_name||''}</span></div>
+                  <div style={S.receiptLine}><span>Client</span><span>{receiptData.client.name}</span></div>
                 </>
               )}
               <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
