@@ -114,10 +114,11 @@ export default function App() {
     setLoyaltySearching(true);
     try {
       // Cherche par name, phone, email
+      const q = query.trim();
       const [r1, r2, r3] = await Promise.all([
-        fetch(`${SUPABASE_URL}/rest/v1/customers?name=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?phone=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
-        fetch(`${SUPABASE_URL}/rest/v1/customers?email=ilike.*${encodeURIComponent(query)}*&select=*`, { headers: SB_HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/customers?name=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/customers?phone=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
+        fetch(`${SUPABASE_URL}/rest/v1/customers?email=ilike.%25${encodeURIComponent(q)}%25&select=*`, { headers: SB_HEADERS }),
       ]);
       const [d1, d2, d3] = await Promise.all([r1.json(), r2.json(), r3.json()]);
       const all = [...(d1||[]), ...(d2||[]), ...(d3||[])];
