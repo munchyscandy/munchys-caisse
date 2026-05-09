@@ -7,6 +7,7 @@ const VRAC_PRICE_PER_100G = 1.50;
 const SUPABASE_URL = "https://swrpladhwaspibpoegwn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_1m5yOZvVzFfXQQYqoN8h_A_nd56vaPI";
 const SB_HEADERS = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" };
+const RESEND_KEY = "re_PGnLJC4M_7XzWAhEPeJq7i9nQaBqEMBJn";
 
 const CATEGORY_EMOJIS = {
   "Bonbons":"🍬","Red bull":"🐂","Fanta":"🧃","Coca cola":"🥤","Monster":"🟢",
@@ -27,10 +28,10 @@ export default function App() {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [modal, setModal] = useState(null);
   const [loyaltyClient, setLoyaltyClient] = useState(null);
+  const [useCagnotte, setUseCagnotte] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [qrInput, setQrInput] = useState("");
   const [loyaltyResults, setLoyaltyResults] = useState([]);
-  const [loyaltySearching, setLoyaltySearching] = useState(false);
   const [vracGrams, setVracGrams] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [customProducts, setCustomProducts] = useState([]);
@@ -39,8 +40,11 @@ export default function App() {
   const [isNewProduct, setIsNewProduct] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-
   const [allCustomers, setAllCustomers] = useState([]);
+  const [emailModal, setEmailModal] = useState(null);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => { loadCustomProducts(); loadAllCustomers(); }, []);
 
@@ -80,7 +84,8 @@ export default function App() {
 
   const cartTotal = cart.reduce((s, i) => s + i.prix * i.qty, 0);
   const tvaAmount = cartTotal * TVA / (1 + TVA);
-  const loyaltyDiscount = loyaltyClient ? Math.min(loyaltyClient.cagnotte || 0, cartTotal) : 0;
+  const cagnotte = loyaltyClient ? (loyaltyClient.cagnotte || 0) : 0;
+  const loyaltyDiscount = (loyaltyClient && useCagnotte) ? Math.min(cagnotte, cartTotal) : 0;
   const finalTotal = cartTotal - loyaltyDiscount;
   const cashbackEarned = finalTotal * CASHBACK_RATE;
 
@@ -118,8 +123,7 @@ export default function App() {
     setVracGrams(""); setModal(null);
   };
 
-  // Recherche client fidélité : QR, téléphone ou nom
-  const searchLoyaltyClient = async (query) => {
+  const searchLoyaltyClient = (query) => {
     if (!query.trim()) { setLoyaltyResults([]); return; }
     const q = query.trim().toLowerCase();
     const results = allCustomers.filter(c =>
@@ -132,30 +136,44 @@ export default function App() {
 
   const selectLoyaltyClient = (client) => {
     setLoyaltyClient(client);
+    setUseCagnotte(false);
     setModal(null);
     setQrInput("");
     setLoyaltyResults([]);
   };
 
+  const removeLoyaltyClient = () => {
+    setLoyaltyClient(null);
+    setUseCagnotte(false);
+  };
+
   const handlePayment = async (method) => {
     if (loyaltyClient) {
-      const newCagnotte = (loyaltyClient.cagnotte || 0) - loyaltyDiscount + cashbackEarned;
+      const newCagnotte = cagnotte - loyaltyDiscount + cashbackEarned;
       await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${loyaltyClient.id}`, {
         method: 'PATCH', headers: { ...SB_HEADERS, Prefer: "return=minimal" },
         body: JSON.stringify({ cagnotte: Math.max(0, newCagnotte) })
       });
+      // Reload updated client
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${loyaltyClient.id}&select=*`, { headers: SB_HEADERS });
+      const data = await res.json();
+      if (data && data[0]) {
+        setLoyaltyClient(data[0]);
+        // Update allCustomers too
+        setAllCustomers(prev => prev.map(c => c.id === data[0].id ? data[0] : c));
+      }
     }
-    setReceiptData({ cart: [...cart], cartTotal, tvaAmount, loyaltyDiscount, cashbackEarned, finalTotal, method, client: loyaltyClient, date: new Date() });
+    setReceiptData({ cart: [...cart], cartTotal, tvaAmount, loyaltyDiscount, cashbackEarned, finalTotal, method, client: loyaltyClient, newCagnotte: loyaltyClient ? Math.max(0, cagnotte - loyaltyDiscount + cashbackEarned) : null, date: new Date() });
     setModal('receipt');
   };
 
   const handleNewSale = () => {
-    setCart([]); setLoyaltyClient(null); setModal(null); setReceiptData(null); setSearch("");
+    setCart([]); setLoyaltyClient(null); setUseCagnotte(false); setModal(null); setReceiptData(null); setSearch("");
   };
 
-  // Upload photo vers Supabase Storage
+  // Upload photo
   const uploadPhoto = async (file) => {
-    if (!file) return null;
+    if (!file) return;
     setUploadingPhoto(true);
     try {
       const ext = file.name.split('.').pop();
@@ -166,8 +184,7 @@ export default function App() {
         body: file
       });
       if (res.ok) {
-        const url = `${SUPABASE_URL}/storage/v1/object/public/product-photos/${filename}`;
-        setEditProduct(p => ({ ...p, photo_url: url }));
+        setEditProduct(p => ({ ...p, photo_url: `${SUPABASE_URL}/storage/v1/object/public/product-photos/${filename}` }));
       } else { alert("Erreur upload photo"); }
     } catch (e) { alert("Erreur: " + e.message); }
     setUploadingPhoto(false);
@@ -222,6 +239,36 @@ export default function App() {
     await loadCustomProducts();
   };
 
+  // Envoi email via Resend
+  const sendEmail = async () => {
+    if (!emailModal || !emailSubject || !emailBody) { alert("Remplissez tous les champs"); return; }
+    setSendingEmail(true);
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "contact@munchyscandy.fr",
+          to: [emailModal.email],
+          subject: emailSubject,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:auto">
+            <h2 style="color:#e91e8c">🍬 Munchy's Candy</h2>
+            <p>${emailBody.replace(/\n/g, '<br>')}</p>
+            <hr><p style="color:#888;font-size:12px">Munchy's Candy · Mouscron, Belgique</p>
+          </div>`
+        })
+      });
+      if (res.ok) {
+        alert(`✅ Email envoyé à ${emailModal.email} !`);
+        setEmailModal(null); setEmailSubject(""); setEmailBody("");
+      } else {
+        const err = await res.json();
+        alert("Erreur: " + (err.message || JSON.stringify(err)));
+      }
+    } catch (e) { alert("Erreur: " + e.message); }
+    setSendingEmail(false);
+  };
+
   const settingsProducts = allProducts.filter(p =>
     settingsSearch === "" || p.nom.toLowerCase().includes(settingsSearch.toLowerCase())
   );
@@ -272,8 +319,44 @@ export default function App() {
         <div style={S.right}>
           <div style={S.cartHeader}>
             🛒 CAISSE
-            {loyaltyClient && <div style={S.loyaltyBadge}>💳 {loyaltyClient.name} — {(loyaltyClient.cagnotte||0).toFixed(2)}€</div>}
+            {/* Carte fidélité sélectionnée */}
+            {loyaltyClient && (
+              <div style={S.loyaltyCard}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <span style={{ fontWeight:800, fontSize:13 }}>💳 {loyaltyClient.name}</span>
+                  <button style={S.removeLoyBtn} onClick={removeLoyaltyClient}>✕</button>
+                </div>
+                <div style={{ fontSize:12, color:'#aaa', margin:'4px 0' }}>
+                  Cagnotte : <b style={{ color:'#e91e8c' }}>{cagnotte.toFixed(2)}€</b>
+                  {loyaltyClient.email && <span style={{ marginLeft:8 }}>· {loyaltyClient.email}</span>}
+                </div>
+                {cagnotte > 0 && (
+                  <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                    <button
+                      style={{ ...S.cognetteBtn, ...(useCagnotte ? S.cognetteBtnActive : {}) }}
+                      onClick={() => setUseCagnotte(true)}>
+                      ✅ Utiliser {Math.min(cagnotte, cartTotal).toFixed(2)}€
+                    </button>
+                    <button
+                      style={{ ...S.cognetteBtn, ...(!useCagnotte ? S.cognetteBtnInactive : {}) }}
+                      onClick={() => setUseCagnotte(false)}>
+                      ❌ Ne pas utiliser
+                    </button>
+                  </div>
+                )}
+                {loyaltyClient.email && (
+                  <button style={S.emailBtn} onClick={() => {
+                    setEmailModal(loyaltyClient);
+                    setEmailSubject("Un message de Munchy's Candy 🍬");
+                    setEmailBody(`Bonjour ${loyaltyClient.name},\n\n`);
+                  }}>
+                    ✉️ Envoyer un email
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+
           <div style={S.cartItems}>
             {cart.length === 0 && <div style={S.emptyCart}>Aucun article</div>}
             {cart.map(item => (
@@ -291,10 +374,12 @@ export default function App() {
               </div>
             ))}
           </div>
+
           <div style={S.cartFooter}>
-            {loyaltyDiscount > 0 && <div style={S.discountRow}><span>🎁 Remise fidélité</span><span>−{fmt(loyaltyDiscount)}</span></div>}
+            {loyaltyDiscount > 0 && <div style={S.discountRow}><span>🎁 Remise cagnotte</span><span>−{fmt(loyaltyDiscount)}</span></div>}
             <div style={S.totalRow}><span>TOTAL TTC</span><span style={S.totalAmount}>{fmt(finalTotal)}</span></div>
             <div style={S.tvaRow}><span>dont TVA 6%</span><span>{fmt(tvaAmount)}</span></div>
+            {loyaltyClient && <div style={S.tvaRow}><span>Cashback +5% à gagner</span><span style={{ color:'#e91e8c' }}>+{fmt(cashbackEarned)}</span></div>}
             <div style={S.paymentBtns}>
               <button style={{ ...S.payBtn, ...S.payCard }} onClick={() => cart.length > 0 && setModal('payment')} disabled={cart.length === 0}>💳 CARTE</button>
               <button style={{ ...S.payBtn, ...S.payCash }} onClick={() => cart.length > 0 && handlePayment('espèces')} disabled={cart.length === 0}>💵 ESPÈCES</button>
@@ -304,7 +389,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* SETTINGS PANEL */}
+      {/* SETTINGS */}
       {showSettings && (
         <div style={S.settingsOverlay}>
           <div style={S.settingsPanel}>
@@ -315,14 +400,11 @@ export default function App() {
                 <button style={S.settingsClose} onClick={() => setShowSettings(false)}>✕</button>
               </div>
             </div>
-            <input style={S.settingsSearch} placeholder="Rechercher..."
-              value={settingsSearch} onChange={e => setSettingsSearch(e.target.value)} autoComplete="off" />
+            <input style={S.settingsSearch} placeholder="Rechercher..." value={settingsSearch} onChange={e => setSettingsSearch(e.target.value)} autoComplete="off" />
             <div style={S.settingsList}>
               {settingsProducts.slice(0, 200).map(p => (
                 <div key={p.id} style={S.settingsItem}>
-                  {p.photo_url
-                    ? <img src={p.photo_url} alt="" style={S.settingsThumb} onError={e => e.target.style.display='none'} />
-                    : <div style={S.settingsEmoji}>{CATEGORY_EMOJIS[p.categorie] || '🍬'}</div>}
+                  {p.photo_url ? <img src={p.photo_url} alt="" style={S.settingsThumb} onError={e => e.target.style.display='none'} /> : <div style={S.settingsEmoji}>{CATEGORY_EMOJIS[p.categorie] || '🍬'}</div>}
                   <div style={S.settingsItemInfo}>
                     <div style={S.settingsItemName}>{p.nom}</div>
                     <div style={S.settingsItemSub}>{p.categorie} · {p.vrac ? `${p.prix.toFixed(2)}€/100g` : `${p.prix.toFixed(2)}€`}{p.barcode ? ` · ${p.barcode}` : ''}</div>
@@ -334,13 +416,13 @@ export default function App() {
                 </div>
               ))}
               {settingsProducts.length === 0 && <div style={{ color:'#888', padding:20, textAlign:'center' }}>Aucun produit trouvé</div>}
-              {settingsProducts.length > 200 && <div style={{ color:'#888', padding:12, textAlign:'center', fontSize:12 }}>Affinez la recherche pour voir plus</div>}
+              {settingsProducts.length > 200 && <div style={{ color:'#888', padding:12, textAlign:'center', fontSize:12 }}>Affinez la recherche</div>}
             </div>
           </div>
         </div>
       )}
 
-      {/* EDIT PRODUCT MODAL */}
+      {/* EDIT PRODUCT */}
       {editProduct && (
         <div style={S.overlay}>
           <div style={{ ...S.modalBox, width:480 }}>
@@ -348,25 +430,19 @@ export default function App() {
             <div style={S.editGrid}>
               <label style={S.editLabel}>Nom *</label>
               <input style={S.editInput} value={editProduct.nom} onChange={e => setEditProduct(p => ({ ...p, nom: e.target.value }))} />
-
               <label style={S.editLabel}>Catégorie</label>
               <select style={S.editInput} value={editProduct.categorie} onChange={e => setEditProduct(p => ({ ...p, categorie: e.target.value }))}>
                 {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-
               <label style={S.editLabel}>Prix (€) *</label>
-              <input style={S.editInput} type="number" step="0.01" value={editProduct.prix}
-                onChange={e => setEditProduct(p => ({ ...p, prix: e.target.value }))} />
-
+              <input style={S.editInput} type="number" step="0.01" value={editProduct.prix} onChange={e => setEditProduct(p => ({ ...p, prix: e.target.value }))} />
               <label style={S.editLabel}>Code-barres</label>
               <input style={S.editInput} value={editProduct.barcode} onChange={e => setEditProduct(p => ({ ...p, barcode: e.target.value }))} />
-
               <label style={S.editLabel}>Photo</label>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 <label style={{ ...S.uploadBtn, opacity: uploadingPhoto ? 0.6 : 1 }}>
                   {uploadingPhoto ? '⏳ Upload...' : '📷 Choisir une photo'}
-                  <input type="file" accept="image/*" style={{ display:'none' }}
-                    onChange={e => e.target.files[0] && uploadPhoto(e.target.files[0])} disabled={uploadingPhoto} />
+                  <input type="file" accept="image/*" style={{ display:'none' }} onChange={e => e.target.files[0] && uploadPhoto(e.target.files[0])} disabled={uploadingPhoto} />
                 </label>
                 {editProduct.photo_url && (
                   <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -374,10 +450,8 @@ export default function App() {
                     <button style={{ ...S.deleteBtn, fontSize:11 }} onClick={() => setEditProduct(p => ({ ...p, photo_url: '' }))}>Supprimer</button>
                   </div>
                 )}
-                <input style={{ ...S.editInput, fontSize:11 }} placeholder="ou coller une URL..." value={editProduct.photo_url}
-                  onChange={e => setEditProduct(p => ({ ...p, photo_url: e.target.value }))} />
+                <input style={{ ...S.editInput, fontSize:11 }} placeholder="ou coller une URL..." value={editProduct.photo_url} onChange={e => setEditProduct(p => ({ ...p, photo_url: e.target.value }))} />
               </div>
-
               <label style={S.editLabel}>Vrac</label>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input type="checkbox" checked={editProduct.vrac} onChange={e => setEditProduct(p => ({ ...p, vrac: e.target.checked }))} style={{ width:18, height:18 }} />
@@ -386,9 +460,26 @@ export default function App() {
             </div>
             <div style={S.modalBtns}>
               <button style={S.btnCancel} onClick={() => setEditProduct(null)}>Annuler</button>
-              <button style={S.btnConfirm} onClick={saveProduct} disabled={savingProduct || uploadingPhoto}>
-                {savingProduct ? 'Sauvegarde...' : '💾 Sauvegarder'}
-              </button>
+              <button style={S.btnConfirm} onClick={saveProduct} disabled={savingProduct || uploadingPhoto}>{savingProduct ? 'Sauvegarde...' : '💾 Sauvegarder'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EMAIL MODAL */}
+      {emailModal && (
+        <div style={S.overlay}>
+          <div style={{ ...S.modalBox, width:500 }}>
+            <h2 style={S.modalTitle}>✉️ Envoyer un email</h2>
+            <p style={S.modalSub}>À : {emailModal.name} — {emailModal.email}</p>
+            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+              <input style={S.editInput} placeholder="Sujet..." value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
+              <textarea style={{ ...S.editInput, minHeight:140, resize:'vertical', lineHeight:1.5 }}
+                placeholder="Message..." value={emailBody} onChange={e => setEmailBody(e.target.value)} />
+            </div>
+            <div style={S.modalBtns}>
+              <button style={S.btnCancel} onClick={() => { setEmailModal(null); setEmailSubject(""); setEmailBody(""); }}>Annuler</button>
+              <button style={S.btnConfirm} onClick={sendEmail} disabled={sendingEmail}>{sendingEmail ? 'Envoi...' : '✉️ Envoyer'}</button>
             </div>
           </div>
         </div>
@@ -402,14 +493,11 @@ export default function App() {
             <p style={S.modalSub}>1,50€ / 100g</p>
             <div style={S.numpad}>
               {['1','2','3','4','5','6','7','8','9','0','00','⌫'].map(k => (
-                <button key={k} style={S.numpadBtn} onClick={() => {
-                  if (k === '⌫') setVracGrams(v => v.slice(0,-1));
-                  else setVracGrams(v => v + k);
-                }}>{k}</button>
+                <button key={k} style={S.numpadBtn} onClick={() => { if (k==='⌫') setVracGrams(v=>v.slice(0,-1)); else setVracGrams(v=>v+k); }}>{k}</button>
               ))}
             </div>
             <div style={S.vracDisplay}>
-              <span style={S.vracGrams}>{vracGrams || '0'} g</span>
+              <span style={S.vracGrams}>{vracGrams||'0'} g</span>
               <span style={S.vracPrice}>= {((parseFloat(vracGrams)||0)/100*VRAC_PRICE_PER_100G).toFixed(2)}€</span>
             </div>
             <div style={S.modalBtns}>
@@ -420,41 +508,36 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL LOYALTY — recherche par QR, téléphone ou nom */}
+      {/* MODAL LOYALTY */}
       {modal === 'loyalty' && (
         <div style={S.overlay}>
           <div style={{ ...S.modalBox, width:460 }}>
             <h2 style={S.modalTitle}>💳 Carte fidélité client</h2>
-            <p style={S.modalSub}>Scannez le QR, ou tapez un numéro de téléphone / nom</p>
-            <p style={{ color: allCustomers.length > 0 ? '#4caf50' : '#ff5555', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
-              {allCustomers.length > 0 ? `✅ ${allCustomers.length} clients chargés` : '⏳ Chargement des clients...'}
+            <p style={S.modalSub}>Scannez le QR, ou tapez téléphone / nom</p>
+            <p style={{ color: allCustomers.length > 0 ? '#4caf50' : '#ff5555', fontSize:12, textAlign:'center', marginBottom:10 }}>
+              {allCustomers.length > 0 ? `✅ ${allCustomers.length} clients` : '⏳ Chargement...'}
             </p>
             <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-              <input style={{ ...S.loyaltyInput, flex:1, marginBottom:0 }}
-                placeholder="QR code, téléphone ou nom..."
-                value={qrInput}
-                onChange={e => { setQrInput(e.target.value); searchLoyaltyClient(e.target.value); }}
-                onKeyDown={e => e.key === 'Enter' && searchLoyaltyClient(qrInput)}
-                autoFocus />
-              <button style={S.btnConfirm} onClick={() => searchLoyaltyClient(qrInput)}>🔍</button>
+              <input style={{ ...S.loyaltyInput, flex:1, marginBottom:0 }} placeholder="QR, téléphone ou nom..."
+                value={qrInput} onChange={e => { setQrInput(e.target.value); searchLoyaltyClient(e.target.value); }} autoFocus />
             </div>
-            {loyaltySearching && <div style={{ color:'#888', textAlign:'center', fontSize:13, marginBottom:12 }}>Recherche...</div>}
             {loyaltyResults.length > 0 && (
-              <div style={{ maxHeight:200, overflowY:'auto', marginBottom:16, display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ maxHeight:220, overflowY:'auto', marginBottom:16, display:'flex', flexDirection:'column', gap:6 }}>
                 {loyaltyResults.map(client => (
                   <button key={client.id} style={S.clientResult} onClick={() => selectLoyaltyClient(client)}>
-                    <div style={{ fontWeight:700, fontSize:14 }}>{client.name}</div>
-                    <div style={{ fontSize:12, color:'#aaa' }}>{client.phone || client.email || ''} · 💰 {(client.cagnotte||0).toFixed(2)}€</div>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontWeight:700, fontSize:14 }}>{client.name}</span>
+                      <span style={{ fontSize:13, color:'#e91e8c', fontWeight:800 }}>💰 {(client.cagnotte||0).toFixed(2)}€</span>
+                    </div>
+                    <div style={{ fontSize:12, color:'#aaa', marginTop:2 }}>{client.phone || ''} {client.email ? `· ${client.email}` : ''}</div>
                   </button>
                 ))}
               </div>
             )}
-            {!loyaltySearching && qrInput.length > 1 && loyaltyResults.length === 0 && (
+            {qrInput.length > 1 && loyaltyResults.length === 0 && (
               <div style={{ color:'#888', textAlign:'center', fontSize:13, marginBottom:16 }}>Aucun client trouvé</div>
             )}
-            <div style={S.modalBtns}>
-              <button style={S.btnCancel} onClick={() => { setModal(null); setQrInput(""); setLoyaltyResults([]); }}>Annuler</button>
-            </div>
+            <button style={S.btnCancel} onClick={() => { setModal(null); setQrInput(""); setLoyaltyResults([]); }}>Annuler</button>
           </div>
         </div>
       )}
@@ -477,7 +560,7 @@ export default function App() {
       {/* MODAL RECEIPT */}
       {modal === 'receipt' && receiptData && (
         <div style={S.overlay}>
-          <div style={{ ...S.modalBox, width:360, maxHeight:'90vh', overflowY:'auto' }}>
+          <div style={{ ...S.modalBox, width:380, maxHeight:'90vh', overflowY:'auto' }}>
             <div id="receipt" style={S.receipt}>
               <div style={S.receiptHeader}>
                 <div style={S.receiptLogo}>🍬 MUNCHY'S CANDY</div>
@@ -486,23 +569,22 @@ export default function App() {
               </div>
               <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
               {receiptData.cart.map((item, i) => (
-                <div key={i} style={S.receiptLine}>
-                  <span>{item.nom} x{item.qty}</span><span>{(item.prix*item.qty).toFixed(2)}€</span>
-                </div>
+                <div key={i} style={S.receiptLine}><span>{item.nom} x{item.qty}</span><span>{(item.prix*item.qty).toFixed(2)}€</span></div>
               ))}
               <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
               <div style={S.receiptLine}><span>Sous-total</span><span>{receiptData.cartTotal.toFixed(2)}€</span></div>
               {receiptData.loyaltyDiscount > 0 && (
-                <div style={{ ...S.receiptLine, color:'#e91e8c' }}><span>🎁 Remise fidélité</span><span>−{receiptData.loyaltyDiscount.toFixed(2)}€</span></div>
+                <div style={{ ...S.receiptLine, color:'#e91e8c' }}><span>🎁 Remise cagnotte</span><span>−{receiptData.loyaltyDiscount.toFixed(2)}€</span></div>
               )}
               <div style={{ ...S.receiptLine, fontWeight:'bold', fontSize:16 }}><span>TOTAL TTC</span><span>{receiptData.finalTotal.toFixed(2)}€</span></div>
               <div style={{ ...S.receiptLine, fontSize:11, color:'#888' }}><span>dont TVA 6%</span><span>{receiptData.tvaAmount.toFixed(2)}€</span></div>
-              <div style={S.receiptLine}><span>Paiement</span><span>{receiptData.method === 'carte' ? '💳 Carte' : '💵 Espèces'}</span></div>
+              <div style={S.receiptLine}><span>Paiement</span><span>{receiptData.method==='carte'?'💳 Carte':'💵 Espèces'}</span></div>
               {receiptData.client && (
                 <>
                   <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
-                  <div style={{ ...S.receiptLine, color:'#e91e8c' }}><span>💳 Cashback +5%</span><span>+{receiptData.cashbackEarned.toFixed(2)}€</span></div>
                   <div style={S.receiptLine}><span>Client</span><span>{receiptData.client.name}</span></div>
+                  <div style={{ ...S.receiptLine, color:'#e91e8c' }}><span>💳 Cashback gagné</span><span>+{receiptData.cashbackEarned.toFixed(2)}€</span></div>
+                  <div style={{ ...S.receiptLine, color:'#4caf50', fontWeight:700 }}><span>Nouveau solde</span><span>{receiptData.newCagnotte.toFixed(2)}€</span></div>
                 </>
               )}
               <div style={S.receiptDivider}>{'─'.repeat(32)}</div>
@@ -536,13 +618,13 @@ const S = {
   headerRight:{display:'flex',gap:8,alignItems:'center',flexShrink:0},
   searchInput:{width:'100%',padding:'8px 14px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.2)',color:'#fff',fontSize:14,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:'none'},
   barcodeInput:{width:150,padding:'7px 12px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:13,fontFamily:"'Nunito',sans-serif",outline:'none'},
-  btnVrac:{padding:'7px 12px',borderRadius:10,border:'none',background:'#fff',color:'#e91e8c',fontWeight:800,fontSize:13,cursor:'pointer',fontFamily:"'Nunito',sans-serif",whiteSpace:'nowrap'},
-  btnFidelite:{padding:'7px 12px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',fontFamily:"'Nunito',sans-serif",whiteSpace:'nowrap'},
+  btnVrac:{padding:'7px 12px',borderRadius:10,border:'none',background:'#fff',color:'#e91e8c',fontWeight:800,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'},
+  btnFidelite:{padding:'7px 12px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',whiteSpace:'nowrap'},
   btnSettings:{padding:'7px 12px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.15)',color:'#fff',fontWeight:700,fontSize:18,cursor:'pointer'},
   main:{display:'flex',flex:1,overflow:'hidden'},
   left:{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'},
   categoryBar:{display:'flex',gap:5,padding:'8px 10px',overflowX:'auto',flexShrink:0,background:'#16162a',borderBottom:'1px solid rgba(255,255,255,0.08)',scrollbarWidth:'none'},
-  catBtn:{padding:'5px 10px',borderRadius:20,border:'2px solid transparent',background:'rgba(255,255,255,0.07)',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',fontFamily:"'Nunito',sans-serif"},
+  catBtn:{padding:'5px 10px',borderRadius:20,border:'2px solid transparent',background:'rgba(255,255,255,0.07)',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap'},
   catBtnActive:{background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',boxShadow:'0 2px 12px rgba(233,30,140,0.4)'},
   productGrid:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:7,padding:10,overflowY:'auto',flex:1,alignContent:'start'},
   productCard:{background:'linear-gradient(145deg,#1e1e35,#252540)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:'10px 7px',cursor:'pointer',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:3},
@@ -551,9 +633,14 @@ const S = {
   productImg:{width:50,height:50,objectFit:'cover',borderRadius:8,marginBottom:2},
   productName:{fontSize:10,fontWeight:700,color:'#ddd',lineHeight:1.2,maxHeight:28,overflow:'hidden'},
   productPrice:{fontSize:13,fontWeight:900,color:'#e91e8c',marginTop:2},
-  right:{width:300,background:'#16162a',borderLeft:'1px solid rgba(255,255,255,0.08)',display:'flex',flexDirection:'column'},
-  cartHeader:{padding:'12px 14px',fontWeight:900,fontSize:16,background:'linear-gradient(135deg,#1e1e35,#252540)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0},
-  loyaltyBadge:{fontSize:11,fontWeight:700,color:'#e91e8c',background:'rgba(233,30,140,0.1)',borderRadius:6,padding:'3px 8px',marginTop:5,display:'inline-block'},
+  right:{width:310,background:'#16162a',borderLeft:'1px solid rgba(255,255,255,0.08)',display:'flex',flexDirection:'column'},
+  cartHeader:{padding:'10px 12px',fontWeight:900,fontSize:15,background:'linear-gradient(135deg,#1e1e35,#252540)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0},
+  loyaltyCard:{background:'rgba(233,30,140,0.08)',border:'1px solid rgba(233,30,140,0.25)',borderRadius:10,padding:'8px 10px',marginTop:8},
+  removeLoyBtn:{background:'transparent',border:'none',color:'#aaa',cursor:'pointer',fontSize:14,fontWeight:700},
+  cognetteBtn:{flex:1,padding:'6px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'transparent',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
+  cognetteBtnActive:{background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',border:'none'},
+  cognetteBtnInactive:{background:'rgba(255,255,255,0.05)',color:'#888'},
+  emailBtn:{width:'100%',marginTop:6,padding:'5px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'transparent',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer'},
   cartItems:{flex:1,overflowY:'auto',padding:'7px 10px',display:'flex',flexDirection:'column',gap:5},
   emptyCart:{color:'#555',textAlign:'center',padding:25,fontSize:13},
   cartItem:{background:'rgba(255,255,255,0.04)',borderRadius:9,padding:'7px 9px',display:'flex',flexDirection:'column',gap:3},
@@ -569,10 +656,10 @@ const S = {
   totalAmount:{fontSize:26,fontWeight:900},
   tvaRow:{display:'flex',justifyContent:'space-between',fontSize:10,color:'#666'},
   paymentBtns:{display:'flex',gap:7},
-  payBtn:{flex:1,padding:'12px 6px',borderRadius:12,border:'none',fontWeight:900,fontSize:14,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
+  payBtn:{flex:1,padding:'12px 6px',borderRadius:12,border:'none',fontWeight:900,fontSize:14,cursor:'pointer'},
   payCard:{background:'linear-gradient(135deg,#e91e8c,#c2185b)',color:'#fff',boxShadow:'0 4px 16px rgba(233,30,140,0.4)'},
   payCash:{background:'linear-gradient(135deg,#4caf50,#388e3c)',color:'#fff'},
-  clearBtn:{padding:7,borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'transparent',color:'#ff5555',fontWeight:700,fontSize:12,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
+  clearBtn:{padding:7,borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'transparent',color:'#ff5555',fontWeight:700,fontSize:12,cursor:'pointer'},
   settingsOverlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.9)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center'},
   settingsPanel:{width:'95%',maxWidth:700,background:'#1a1a2e',display:'flex',flexDirection:'column',height:'90vh',borderRadius:16,overflow:'hidden',border:'1px solid rgba(255,255,255,0.1)'},
   settingsHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',fontWeight:900,fontSize:18,flexShrink:0},
@@ -600,13 +687,13 @@ const S = {
   loyaltyInput:{width:'100%',padding:'11px 14px',borderRadius:10,border:'2px solid rgba(233,30,140,0.3)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:15,fontFamily:"'Nunito',sans-serif",outline:'none',marginBottom:12},
   clientResult:{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(233,30,140,0.2)',background:'rgba(233,30,140,0.05)',color:'#fff',cursor:'pointer',textAlign:'left',fontFamily:"'Nunito',sans-serif"},
   numpad:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:14},
-  numpadBtn:{padding:14,borderRadius:10,border:'none',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
+  numpadBtn:{padding:14,borderRadius:10,border:'none',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer'},
   vracDisplay:{display:'flex',justifyContent:'space-between',alignItems:'center',background:'rgba(233,30,140,0.1)',borderRadius:10,padding:'12px 16px',marginBottom:16},
   vracGrams:{fontSize:24,fontWeight:900},
   vracPrice:{fontSize:20,fontWeight:900,color:'#e91e8c'},
   modalBtns:{display:'flex',gap:8},
-  btnCancel:{flex:1,padding:11,borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'#aaa',fontWeight:700,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
-  btnConfirm:{flex:1,padding:11,borderRadius:10,border:'none',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',fontWeight:800,cursor:'pointer',fontFamily:"'Nunito',sans-serif"},
+  btnCancel:{flex:1,padding:11,borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'#aaa',fontWeight:700,cursor:'pointer'},
+  btnConfirm:{flex:1,padding:11,borderRadius:10,border:'none',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',fontWeight:800,cursor:'pointer'},
   receipt:{fontFamily:'monospace',fontSize:12,lineHeight:1.6,color:'#ddd',padding:'8px 0',marginBottom:16},
   receiptHeader:{textAlign:'center',marginBottom:8},
   receiptLogo:{fontSize:16,fontWeight:900,color:'#e91e8c'},
