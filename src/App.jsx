@@ -85,7 +85,16 @@ export default function App() {
   const [stockQty, setStockQty] = useState('');
   const [stockAlert, setStockAlert] = useState('5');
 
-  useEffect(() => { loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession(); }, []);
+  useEffect(() => {
+    loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession();
+    // Précharger Quagga (meilleur pour codes-barres 1D EAN-13)
+    if (!document.getElementById('quagga-script')) {
+      const s = document.createElement('script');
+      s.id = 'quagga-script';
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+      document.head.appendChild(s);
+    }
+  }, []);
 
   const loadCustomProducts = async () => {
     try {
@@ -1283,7 +1292,19 @@ export default function App() {
                     ()=>{})
                   .catch(e=>{alert("❌ Caméra: "+e);stopBarcodeScanner();});
                 };
-                document.head.appendChild(s);
+                if (window.Html5Qrcode) {
+                  startCartScan();
+                } else {
+                  const s = document.getElementById('html5qrcode-script');
+                  if (s) { s.onload = startCartScan; }
+                  else {
+                    const sc2=document.createElement('script');
+                    sc2.id='html5qrcode-script';
+                    sc2.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+                    sc2.onload=startCartScan;
+                    document.head.appendChild(sc2);
+                  }
+                }
               }}/>
             <button style={S.btnCancel} onClick={stopBarcodeScanner}>✕ Annuler</button>
           </div>
@@ -1300,9 +1321,7 @@ export default function App() {
               ref={el=>{
                 if(!el||window._cartScannerInit) return;
                 window._cartScannerInit=true;
-                const s=document.createElement('script');
-                s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-                s.onload=()=>{
+                const startCartScan = () => {
                   const sc=new window.Html5Qrcode('cart-barcode-reader');
                   window._cartScanner=sc;
                   sc.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:120}},
@@ -1310,14 +1329,20 @@ export default function App() {
                       if(window._cartScanned) return;
                       window._cartScanned=true;
                       // Chercher le produit
-                      const found = allProducts.find(p=>p.barcode===code||p.barcode===String(code));
+                      const codeClean = String(code).trim().replace(/^0+/, '') || '0';
+                      const found = allProducts.find(p=>p.barcode&&(
+                        String(p.barcode).trim()===codeClean ||
+                        String(p.barcode).trim()===String(code).trim() ||
+                        String(p.barcode).trim().replace(/^0+/,'')===codeClean
+                      ));
                       if(sc){sc.stop().then(()=>{window._cartScanner=null;window._cartScannerInit=false;window._cartScanned=false;}).catch(()=>{});}
                       setShowCartScanner(false);
                       if(found){
                         addToCart(found);
-                        alert('✅ '+found.nom+' ajouté au panier !');
+                        // Ajouter sans alert pour être rapide
+                        addToCart(found);
                       } else {
-                        alert('❌ Produit non trouvé pour le code: '+code);
+                        alert('❌ Code: '+codeClean+'\n\nProduit non enregistré.\nVa dans ⚙️ → Produits → modifier le produit → scan barcode pour l\'associer.');
                       }
                     },
                     ()=>{}
@@ -1326,7 +1351,7 @@ export default function App() {
                 document.head.appendChild(s);
               }}/>
             <button style={{...S.btnCancel,background:'#eee',color:'#333',border:'1px solid #ccc'}} onClick={()=>{
-              if(window._cartScanner){window._cartScanner.stop().catch(()=>{});window._cartScanner=null;}
+              try{if(window._quaggaRunning){window.Quagga.stop();window._quaggaRunning=false;}}catch(e){}
               window._cartScannerInit=false;window._cartScanned=false;
               setShowCartScanner(false);
             }}>✕ Annuler</button>
