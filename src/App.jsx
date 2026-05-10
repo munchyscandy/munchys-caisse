@@ -1273,7 +1273,7 @@ export default function App() {
                   const sc=new window.Html5Qrcode("barcode-reader");
                   window._html5QrCode=sc;
                   sc.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:120}},
-                    (code)=>{setEditProduct(p=>({...p,barcode:code}));stopBarcodeScanner();alert("✅ Code: "+code);},
+                    (code)=>{if(window._scanned) return; window._scanned=true; if(window._html5QrCode){window._html5QrCode.stop().then(()=>{window._html5QrCode=null;window._scannerInit=false;window._scanned=false;setShowBarcodeScanner(false);}).catch(()=>{});} setEditProduct(p=>({...p,barcode:code}));},
                     ()=>{})
                   .catch(e=>{alert("❌ Caméra: "+e);stopBarcodeScanner();});
                 };
