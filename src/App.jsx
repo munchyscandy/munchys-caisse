@@ -714,8 +714,8 @@ export default function App() {
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"/>
         </div>
         <div style={S.hRight}>
-          <input style={S.barcodeInput} placeholder="Code-barres..."
-            value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
+          <button style={{...S.btnD,fontSize:20,padding:'8px 14px'}} onClick={()=>setShowCartScanner(true)}>📷</button>
+          <input style={{display:'none'}} value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
           <button style={S.btnD} onClick={()=>{setModal('loyalty');setLoySearch('');setLoyResults([]);loadClients();}}>💳</button>
           <button style={S.btnD} onClick={()=>{if(pinUnlocked){setShowSettings(true);loadStock();}else{setShowPinModal(true);}}}>⚙️</button>
@@ -1070,7 +1070,7 @@ export default function App() {
                   </label>
                   <label style={{...S.uploadBtn,flex:1,textAlign:'center',opacity:uploading?0.6:1,background:'linear-gradient(135deg,#78B7A0,#3d7a63)'}}>
                     {uploading?'⏳...':'📷 Caméra'}
-                    <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>e.target.files[0]&&uploadPhoto(e.target.files[0])} disabled={uploading}/>
+                    <input type="file" accept="image/*;capture=camera" capture style={{display:'none'}} onChange={e=>e.target.files[0]&&uploadPhoto(e.target.files[0])} disabled={uploading}/>
                   </label>
                 </div>
                 {editProduct.photo_url&&(
