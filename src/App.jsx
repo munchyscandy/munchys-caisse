@@ -1291,13 +1291,13 @@ export default function App() {
           <h2 style={S.mTitle}>Code PIN requis</h2>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>
             {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k,i)=>(
-              <button key={i} style={{width:'100%',height:52,fontSize:22,borderRadius:12,border:k?'1px solid rgba(255,255,255,0.1)':'none',background:k?'rgba(255,255,255,0.08)':'transparent',color:'#fff',cursor:'pointer'}}
+              <button key={i} style={{width:'100%',height:52,fontSize:22,borderRadius:12,border:k?'1px solid #ccc':'none',background:k?'#fff':'transparent',color:'#111',fontWeight:700,cursor:'pointer',boxShadow:k?'0 2px 6px rgba(0,0,0,0.1)':'none'}}
                 onClick={()=>{if(k==='⌫')setPinInput(p=>p.slice(0,-1));else if(k)setPinInput(p=>p+k);}}>
                 {k}
               </button>
             ))}
           </div>
-          <div style={{fontSize:28,letterSpacing:12,marginBottom:16,color:C1}}>
+          <div style={{fontSize:28,letterSpacing:12,marginBottom:16,color:'#D3518B'}}>
             {'●'.repeat(pinInput.length)}{'○'.repeat(Math.max(0,4-pinInput.length))}
           </div>
           <div style={S.mBtns}>
@@ -1374,10 +1374,9 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        .settings-dark *{color:#111 !important}
-        .settings-dark input, .settings-dark textarea, .settings-dark select{background:rgba(255,255,255,0.8) !important;color:#111 !important;border:1px solid rgba(0,0,0,0.2) !important}
-        .settings-dark span, .settings-dark label, .settings-dark div, .settings-dark p, .settings-dark h2, .settings-dark b{color:#111 !important}
-        .settings-dark button{color:#111 !important}
+        .settings-dark, .settings-dark *{color:#111 !important}
+        .settings-dark input,.settings-dark textarea,.settings-dark select{background:rgba(255,255,255,0.9) !important;color:#111 !important;border:1px solid rgba(0,0,0,0.15) !important}
+        .settings-dark button:not([style*='background:linear']):not([style*='background:#ff']){background:rgba(255,255,255,0.3) !important}
         body{font-family:'Nunito',sans-serif;background:#78B7A0}
         button:disabled{opacity:0.4;cursor:not-allowed}
         button:active{transform:scale(0.97)}
@@ -1440,7 +1439,7 @@ const S = {
   clearRemise:{padding:'8px 10px',borderRadius:10,border:'1px solid rgba(255,50,50,0.2)',background:'rgba(255,50,50,0.06)',color:'#ff6b6b',fontWeight:700,fontSize:12,cursor:'pointer'},
   clearBtn:{padding:8,borderRadius:10,border:'1px solid rgba(255,50,50,0.12)',background:'transparent',color:'#ff4444',fontWeight:700,fontSize:12,cursor:'pointer'},
   settingsOverlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.88)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(8px)'},
-  settingsPanel:{width:'95%',maxWidth:780,background:'#f5f5f5',display:'flex',flexDirection:'column',height:'92vh',borderRadius:20,overflow:'hidden',border:`1px solid rgba(120,183,160,0.2)`,boxShadow:'0 30px 80px rgba(0,0,0,0.8)'},
+  settingsPanel:{width:'95%',maxWidth:780,background:'linear-gradient(145deg,#5aa08a,#78B7A0)',display:'flex',flexDirection:'column',height:'92vh',borderRadius:20,overflow:'hidden',border:`1px solid rgba(120,183,160,0.2)`,boxShadow:'0 30px 80px rgba(0,0,0,0.8)'},
   settingsHead:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',background:`linear-gradient(135deg,${C1},${C1d},${C2d},${C2})`,flexShrink:0},
   tabBtn:{padding:'6px 12px',borderRadius:10,border:'2px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.07)',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer'},
   tabActive:{background:'rgba(255,255,255,0.95)',color:C1,border:'2px solid transparent'},
@@ -1448,12 +1447,12 @@ const S = {
   btnAdd:{padding:'6px 14px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.95)',color:C1,fontWeight:800,cursor:'pointer',fontSize:13},
   settingsSearch:{margin:'10px 14px 6px',padding:'9px 14px',borderRadius:12,border:`1px solid rgba(120,183,160,0.1)`,background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:13,outline:'none',flexShrink:0},
   settingsList:{flex:1,overflowY:'auto',padding:'4px 12px 12px'},
-  sItem:{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:12,marginBottom:6,background:'#fff',border:'1px solid #ddd',color:'#111'},
+  sItem:{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:12,marginBottom:6,background:'rgba(255,255,255,0.9)',border:'1px solid rgba(0,0,0,0.1)',color:'#111'},
   sThumb:{width:44,height:44,objectFit:'cover',borderRadius:10,flexShrink:0},
   editBtn:{padding:'6px 10px',borderRadius:8,border:'none',background:`rgba(211,81,139,0.15)`,color:C1,fontWeight:700,cursor:'pointer',fontSize:14},
   delBtn:{padding:'6px 9px',borderRadius:8,border:'none',background:'rgba(180,20,20,0.25)',color:'#8b0000',fontWeight:700,cursor:'pointer',fontSize:14},
   overlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.82)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,backdropFilter:'blur(12px)'},
-  modal:{background:'#f5f5f5',borderRadius:20,padding:26,width:430,maxWidth:'95vw',boxShadow:'0 30px 80px rgba(0,0,0,0.9)',border:`1px solid rgba(120,183,160,0.18)`},
+  modal:{background:'linear-gradient(145deg,#e8f5f0,#d0ede5)',borderRadius:20,padding:26,width:430,maxWidth:'95vw',boxShadow:'0 30px 80px rgba(0,0,0,0.9)',border:`1px solid rgba(120,183,160,0.18)`},
   mTitle:{fontSize:21,fontWeight:900,marginBottom:18,textAlign:'center',letterSpacing:'-0.5px',color:'#111'},
   mBtns:{display:'flex',gap:10},
   btnCancel:{flex:1,padding:12,borderRadius:12,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)',color:'#777',fontWeight:700,cursor:'pointer',fontSize:14},
