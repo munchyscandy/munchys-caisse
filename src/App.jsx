@@ -67,6 +67,7 @@ export default function App() {
   const [showCloseSession, setShowCloseSession] = useState(false);
   const [montantOuverture, setMontantOuverture] = useState('');
   const [montantFermeture, setMontantFermeture] = useState('');
+  const [closingData, setClosingData] = useState({especes:0,carte:0,loaded:false});
   const [noteEcart, setNoteEcart] = useState('');
   // Settings
   const [showSettings, setShowSettings] = useState(false);
@@ -487,15 +488,18 @@ export default function App() {
       alert("Vous devez entrer le montant compté en caisse !");
       return;
     }
-    let especes = 0; let carte = 0;
-    try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`, { headers: SB });
-      const data = await r.json();
-      if (Array.isArray(data)) {
-        especes = data.filter(v=>v.paiement==="espèces").reduce((s,v)=>s+parseFloat(v.total||0),0);
-        carte = data.filter(v=>v.paiement==="carte").reduce((s,v)=>s+parseFloat(v.total||0),0);
-      }
-    } catch(e) {}
+    // Utiliser les données déjà chargées ou refetch
+    let especes = closingData.especes; let carte = closingData.carte;
+    if (!closingData.loaded) {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`, { headers: SB });
+        const data = await r.json();
+        if (Array.isArray(data)) {
+          especes = data.filter(v=>v.paiement==="espèces").reduce((s,v)=>s+parseFloat(v.total||0),0);
+          carte = data.filter(v=>v.paiement==="carte").reduce((s,v)=>s+parseFloat(v.total||0),0);
+        }
+      } catch(e) {}
+    }
     const ouverture = parseFloat(session.montant_ouverture||0);
     const attendu = parseFloat((ouverture + especes).toFixed(2));
     const ecart = parseFloat((mf - attendu).toFixed(2));
@@ -646,11 +650,22 @@ export default function App() {
 
   const annulerVente = async (id, motif) => {
     if (!motif.trim()) { alert("Motif obligatoire"); return; }
-    await fetch(`${SUPABASE_URL}/rest/v1/ventes?id=eq.${id}`, {
-      method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
-      body: JSON.stringify({annulee:true, note_annulation:motif})
-    });
-    loadVentes(journalDate);
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?id=eq.${id}`, {
+        method:'PATCH',
+        headers:{...SB, Prefer:"return=representation"},
+        body: JSON.stringify({annulee:true, note_annulation:motif})
+      });
+      if (r.ok) {
+        alert("✅ Vente annulée !");
+        loadVentes(journalDate);
+      } else {
+        const err = await r.text();
+        alert("❌ Erreur annulation: " + r.status + " — " + err);
+      }
+    } catch(e) {
+      alert("❌ Erreur réseau: " + e.message);
+    }
   };
 
   const sendEmail = async () => {
@@ -813,7 +828,19 @@ export default function App() {
                 {settingsTab==='produits' && <button style={S.btnAdd} onClick={()=>openEdit(null,true)}>+ Nouveau</button>}
                 {settingsTab==='box' && <button style={S.btnAdd} onClick={newBox}>+ Nouvelle box</button>}
                 {settingsTab==='caisse' && !session && <button style={S.btnAdd} onClick={()=>setShowOpenSession(true)}>🏦 Ouvrir caisse</button>}
-                {settingsTab==='caisse' && session && <button style={{...S.btnAdd,background:'#ff5555',color:'#fff'}} onClick={()=>setShowCloseSession(true)}>🔒 Fermer caisse</button>}
+                {settingsTab==='caisse' && session && <button style={{...S.btnAdd,background:'#ff5555',color:'#fff'}} onClick={async()=>{
+                  setShowCloseSession(true);
+                  setClosingData({especes:0,carte:0,loaded:false});
+                  try {
+                    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`,{headers:SB});
+                    const d = await r.json();
+                    if(Array.isArray(d)){
+                      const esp = d.filter(v=>v.paiement==="espèces").reduce((s,v)=>s+parseFloat(v.total||0),0);
+                      const car = d.filter(v=>v.paiement==="carte").reduce((s,v)=>s+parseFloat(v.total||0),0);
+                      setClosingData({especes:esp,carte:car,loaded:true});
+                    }
+                  } catch(e){setClosingData({especes:0,carte:0,loaded:true});}
+                }}>🔒 Fermer caisse</button>}
                 <button style={{...S.tabBtn,background:testMode?'rgba(255,165,0,0.9)':'rgba(0,0,0,0.3)',color:'#fff',border:'none',fontSize:11}} onClick={()=>setTestMode(t=>!t)}>
                   {testMode?'🧪 TEST ON':'🧪 TEST'}
                 </button>
