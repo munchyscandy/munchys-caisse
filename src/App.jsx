@@ -1063,10 +1063,16 @@ export default function App() {
               </div>
               <label style={S.eLabel}>Photo</label>
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
-                <label style={{...S.uploadBtn,opacity:uploading?0.6:1}}>
-                  {uploading?'⏳...':'📷 Choisir photo'}
-                  <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files[0]&&uploadPhoto(e.target.files[0])} disabled={uploading}/>
-                </label>
+                <div style={{display:'flex',gap:8}}>
+                  <label style={{...S.uploadBtn,flex:1,textAlign:'center',opacity:uploading?0.6:1}}>
+                    {uploading?'⏳...':'🖼️ Galerie'}
+                    <input type="file" accept="image/*" style={{display:'none'}} onChange={e=>e.target.files[0]&&uploadPhoto(e.target.files[0])} disabled={uploading}/>
+                  </label>
+                  <label style={{...S.uploadBtn,flex:1,textAlign:'center',opacity:uploading?0.6:1,background:'linear-gradient(135deg,#78B7A0,#3d7a63)'}}>
+                    {uploading?'⏳...':'📷 Caméra'}
+                    <input type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={e=>e.target.files[0]&&uploadPhoto(e.target.files[0])} disabled={uploading}/>
+                  </label>
+                </div>
                 {editProduct.photo_url&&(
                   <div style={{display:'flex',alignItems:'center',gap:8}}>
                     <img src={editProduct.photo_url} style={{width:50,height:50,objectFit:'cover',borderRadius:8}} onError={e=>e.target.style.display='none'}/>
