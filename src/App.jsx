@@ -1542,3 +1542,4 @@ const S = {
   eInput:{padding:'9px 12px',borderRadius:8,border:'1px solid #ddd',background:'#fafafa',color:'#111',fontSize:14,outline:'none',width:'100%'},
   uploadBtn:{display:'inline-block',padding:'9px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#D3518B,#78B7A0)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center'},
 };
+
