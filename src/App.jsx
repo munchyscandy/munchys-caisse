@@ -47,6 +47,8 @@ export default function App() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  // Mode test
+  const [testMode, setTestMode] = useState(false);
   // PIN & Session
   const [pinInput, setPinInput] = useState('');
   const [pinUnlocked, setPinUnlocked] = useState(false);
@@ -270,24 +272,26 @@ export default function App() {
   };
 
   const handlePayment = async (method) => {
-    if (client) {
+    if (client && !testMode) {
       const newCag = cagnotte - cagnotteUsed + cashback;
       await fetch(`${SUPABASE_URL}/rest/v1/customers?id=eq.${client.id}`, {
         method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
         body: JSON.stringify({cagnotte: Math.max(0,newCag)})
       });
     }
-    // Enregistrer la vente
-    await fetch(`${SUPABASE_URL}/rest/v1/ventes`, {
-      method:'POST', headers:{...SB,Prefer:"return=minimal"},
-      body: JSON.stringify({
-        articles: JSON.stringify(cart),
-        total: finalTotal, paiement: method,
-        remise: discountAmt, cagnotte_used: cagnotteUsed,
-        client_nom: client ? client.name : null,
-        client_id: client ? client.id : null
-      })
-    });
+    // Enregistrer la vente (sauf en mode test)
+    if (!testMode) {
+      await fetch(`${SUPABASE_URL}/rest/v1/ventes`, {
+        method:'POST', headers:{...SB,Prefer:"return=minimal"},
+        body: JSON.stringify({
+          articles: JSON.stringify(cart),
+          total: finalTotal, paiement: method,
+          remise: discountAmt, cagnotte_used: cagnotteUsed,
+          client_nom: client ? client.name : null,
+          client_id: client ? client.id : null
+        })
+      });
+    }
     setReceipt({cart:[...cart], cartTotal, cagnotteUsed, discountAmt, finalTotal, tva, cashback, method, client, date:new Date()});
     setModal('receipt');
   };
@@ -586,7 +590,7 @@ Carte: ${carte.toFixed(2)}€
         {/* RIGHT */}
         <div style={S.right}>
           <div style={S.cartHead}>
-            🛒 CAISSE
+            🛒 CAISSE {testMode && <span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 7px',borderRadius:6,marginLeft:8,letterSpacing:'0.5px'}}>🧪 TEST</span>}
             {client && (
               <div style={S.loyCard}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -669,6 +673,9 @@ Carte: ${carte.toFixed(2)}€
                 {settingsTab==='box' && <button style={S.btnAdd} onClick={newBox}>+ Nouvelle box</button>}
                 {settingsTab==='caisse' && !session && <button style={S.btnAdd} onClick={()=>setShowOpenSession(true)}>🏦 Ouvrir caisse</button>}
                 {settingsTab==='caisse' && session && <button style={{...S.btnAdd,background:'#ff5555',color:'#fff'}} onClick={()=>setShowCloseSession(true)}>🔒 Fermer caisse</button>}
+                <button style={{...S.tabBtn,background:testMode?'rgba(255,165,0,0.9)':'rgba(0,0,0,0.3)',color:'#fff',border:'none',fontSize:11}} onClick={()=>setTestMode(t=>!t)}>
+                  {testMode?'🧪 TEST ON':'🧪 TEST'}
+                </button>
                 <button style={S.settingsClose} onClick={()=>setShowSettings(false)}>✕</button>
               </div>
             </div>
