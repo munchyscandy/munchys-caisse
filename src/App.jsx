@@ -1374,6 +1374,10 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
+        .settings-dark *{color:#111 !important}
+        .settings-dark input, .settings-dark textarea, .settings-dark select{background:rgba(255,255,255,0.8) !important;color:#111 !important;border:1px solid rgba(0,0,0,0.2) !important}
+        .settings-dark span, .settings-dark label, .settings-dark div, .settings-dark p, .settings-dark h2, .settings-dark b{color:#111 !important}
+        .settings-dark button{color:#111 !important}
         body{font-family:'Nunito',sans-serif;background:#78B7A0}
         button:disabled{opacity:0.4;cursor:not-allowed}
         button:active{transform:scale(0.97)}
