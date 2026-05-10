@@ -554,11 +554,6 @@ Carte: ${carte.toFixed(2)}€
             value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
           <button style={S.btnD} onClick={()=>{setModal('loyalty');setLoySearch('');setLoyResults([]);loadClients();}}>💳</button>
-          {!session
-            ? <button style={{...S.btnD,background:'rgba(255,165,0,0.3)',color:'#ffb74d',fontSize:12,padding:'6px 10px'}} onClick={()=>setShowOpenSession(true)}>🏦 Ouvrir</button>
-            : <button style={{...S.btnD,background:'rgba(76,175,80,0.3)',color:'#81c784',fontSize:12,padding:'6px 10px'}} onClick={()=>setShowCloseSession(true)}>🔒 Fermer</button>
-          }
-          <button style={{...S.btnD,fontSize:12,padding:'6px 10px'}} onClick={()=>{setShowJournal(true);loadVentes(journalDate);}}>📊 Ventes</button>
           <button style={S.btnD} onClick={()=>{ if(pinUnlocked){setShowSettings(true);loadStock();}else{setShowPinModal(true);} }}>⚙️</button>
         </div>
       </div>
@@ -666,10 +661,14 @@ Carte: ${carte.toFixed(2)}€
                 <button style={{...S.tabBtn,...(settingsTab==='produits'?S.tabActive:{})}} onClick={()=>setSettingsTab('produits')}>🛍️ Produits</button>
                 <button style={{...S.tabBtn,...(settingsTab==='box'?S.tabActive:{})}} onClick={()=>setSettingsTab('box')}>📦 Box Mystère</button>
                 <button style={{...S.tabBtn,...(settingsTab==='stock'?S.tabActive:{})}} onClick={()=>{setSettingsTab('stock');loadStock();}}>📊 Stock</button>
+                <button style={{...S.tabBtn,...(settingsTab==='ventes'?S.tabActive:{})}} onClick={()=>{setSettingsTab('ventes');loadVentes(journalDate);}}>🧾 Ventes</button>
+                <button style={{...S.tabBtn,...(settingsTab==='caisse'?S.tabActive:{})}} onClick={()=>setSettingsTab('caisse')}>🏦 Caisse</button>
               </div>
               <div style={{display:'flex',gap:8}}>
                 {settingsTab==='produits' && <button style={S.btnAdd} onClick={()=>openEdit(null,true)}>+ Nouveau</button>}
                 {settingsTab==='box' && <button style={S.btnAdd} onClick={newBox}>+ Nouvelle box</button>}
+                {settingsTab==='caisse' && !session && <button style={S.btnAdd} onClick={()=>setShowOpenSession(true)}>🏦 Ouvrir caisse</button>}
+                {settingsTab==='caisse' && session && <button style={{...S.btnAdd,background:'#ff5555',color:'#fff'}} onClick={()=>setShowCloseSession(true)}>🔒 Fermer caisse</button>}
                 <button style={S.settingsClose} onClick={()=>setShowSettings(false)}>✕</button>
               </div>
             </div>
@@ -727,6 +726,72 @@ Carte: ${carte.toFixed(2)}€
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* VENTES TAB */}
+            {settingsTab==='ventes' && (
+              <>
+                <div style={{padding:'10px 16px 6px',display:'flex',gap:12,alignItems:'center',flexShrink:0,flexWrap:'wrap'}}>
+                  <input type="date" style={{...S.eInput,width:'auto',padding:'7px 12px'}}
+                    value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
+                  <span style={{fontSize:13,color:'#888'}}>💳 <b style={{color:'#e91e8c'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:13,color:'#888'}}>💵 <b style={{color:'#4caf50'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:13,color:'#888'}}>Total: <b style={{color:'#fff'}}>{ventes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:12,color:'#555',marginLeft:'auto'}}>{ventes.filter(v=>!v.annulee).length} vente(s)</span>
+                </div>
+                <div style={S.settingsList}>
+                  {!ventes.length && <div style={{color:'#888',textAlign:'center',padding:30}}>Aucune vente ce jour</div>}
+                  {ventes.map(v=>{
+                    const arts = typeof v.articles==='string' ? JSON.parse(v.articles) : v.articles;
+                    return (
+                      <div key={v.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:5,opacity:v.annulee?0.4:1}}>
+                        <div style={{display:'flex',justifyContent:'space-between',width:'100%',alignItems:'center'}}>
+                          <div>
+                            <span style={{fontWeight:800,fontSize:15,color:v.paiement==='carte'?'#e91e8c':'#4caf50'}}>
+                              {v.paiement==='carte'?'💳':'💵'} {parseFloat(v.total).toFixed(2)}€
+                            </span>
+                            {v.client_nom && <span style={{fontSize:12,color:'#aaa',marginLeft:10}}>👤 {v.client_nom}</span>}
+                            {v.annulee && <span style={{fontSize:11,color:'#ff5555',marginLeft:8}}>⛔ ANNULÉE</span>}
+                          </div>
+                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                            <span style={{fontSize:11,color:'#555'}}>{new Date(v.date_heure).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</span>
+                            {!v.annulee && (
+                              <button style={S.delBtn} onClick={()=>{
+                                const motif = prompt("Motif d'annulation obligatoire :");
+                                if(motif!==null) annulerVente(v.id, motif);
+                              }}>⛔</button>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{fontSize:11,color:'#777'}}>{(arts||[]).map(a=>`${a.nom} x${a.qty}`).join(' · ')}</div>
+                        {v.note_annulation && <div style={{fontSize:11,color:'#ff5555',fontStyle:'italic'}}>Motif: {v.note_annulation}</div>}
+                        {v.remise>0 && <div style={{fontSize:11,color:'#ffa500'}}>Remise: -{parseFloat(v.remise).toFixed(2)}€</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* CAISSE TAB */}
+            {settingsTab==='caisse' && (
+              <div style={{padding:20,display:'flex',flexDirection:'column',gap:14,overflowY:'auto',flex:1}}>
+                {!session ? (
+                  <div style={{textAlign:'center',padding:30}}>
+                    <div style={{fontSize:48,marginBottom:12}}>🏦</div>
+                    <div style={{fontSize:16,fontWeight:700,color:'#aaa',marginBottom:6}}>Caisse non ouverte</div>
+                    <div style={{fontSize:13,color:'#666'}}>Ouvre la caisse le matin en entrant le fond de caisse</div>
+                  </div>
+                ) : (
+                  <div style={{background:'rgba(76,175,80,0.08)',border:'1px solid rgba(76,175,80,0.2)',borderRadius:14,padding:16}}>
+                    <div style={{fontSize:13,fontWeight:700,color:'#81c784',marginBottom:10}}>✅ Caisse ouverte depuis {new Date(session.date_ouverture).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</div>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                      <span style={{color:'#888',fontSize:13}}>Fond d'ouverture</span>
+                      <span style={{fontWeight:800,fontSize:15}}>{parseFloat(session.montant_ouverture||0).toFixed(2)}€</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1179,60 +1244,6 @@ Carte: ${carte.toFixed(2)}€
         </div>
       )}
 
-      {/* JOURNAL DES VENTES */}
-      {showJournal && (
-        <div style={S.settingsOverlay}>
-          <div style={S.settingsPanel}>
-            <div style={S.settingsHead}>
-              <span style={{fontWeight:900,fontSize:17}}>📊 Journal des ventes</span>
-              <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                <input type="date" style={{...S.eInput,width:'auto',padding:'6px 12px'}}
-                  value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
-                <button style={S.settingsClose} onClick={()=>setShowJournal(false)}>✕</button>
-              </div>
-            </div>
-            <div style={{padding:'10px 16px 6px',display:'flex',gap:16,fontSize:13,color:'#888',flexShrink:0}}>
-              <span>💳 Carte: <b style={{color:'#e91e8c'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-              <span>💵 Espèces: <b style={{color:'#4caf50'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-              <span>📦 Total: <b style={{color:'#fff'}}>{ventes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-              <span style={{marginLeft:'auto'}}>{ventes.filter(v=>!v.annulee).length} vente(s)</span>
-            </div>
-            <div style={S.settingsList}>
-              {!ventes.length && <div style={{color:'#888',textAlign:'center',padding:30}}>Aucune vente ce jour</div>}
-              {ventes.map(v=>{
-                const arts = typeof v.articles==='string' ? JSON.parse(v.articles) : v.articles;
-                return (
-                  <div key={v.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:5,opacity:v.annulee?0.4:1}}>
-                    <div style={{display:'flex',justifyContent:'space-between',width:'100%',alignItems:'center'}}>
-                      <div>
-                        <span style={{fontWeight:800,fontSize:14,color:v.paiement==='carte'?'#e91e8c':'#4caf50'}}>
-                          {v.paiement==='carte'?'💳':'💵'} {parseFloat(v.total).toFixed(2)}€
-                        </span>
-                        {v.client_nom && <span style={{fontSize:12,color:'#aaa',marginLeft:10}}>👤 {v.client_nom}</span>}
-                        {v.annulee && <span style={{fontSize:11,color:'#ff5555',marginLeft:10}}>⛔ ANNULÉE</span>}
-                      </div>
-                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                        <span style={{fontSize:11,color:'#666'}}>{new Date(v.date_heure).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</span>
-                        {!v.annulee && (
-                          <button style={S.delBtn} onClick={()=>{
-                            const motif = prompt("Motif d'annulation (obligatoire) :");
-                            if(motif!==null) annulerVente(v.id, motif);
-                          }}>⛔</button>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{fontSize:11,color:'#777'}}>
-                      {(arts||[]).map(a=>`${a.nom} x${a.qty}`).join(' · ')}
-                    </div>
-                    {v.note_annulation && <div style={{fontSize:11,color:'#ff5555',fontStyle:'italic'}}>Motif: {v.note_annulation}</div>}
-                    {v.remise>0 && <div style={{fontSize:11,color:'#ffa500'}}>Remise: -{parseFloat(v.remise).toFixed(2)}€</div>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
