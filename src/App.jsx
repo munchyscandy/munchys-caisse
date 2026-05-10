@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { products as BASE_PRODUCTS } from "./products";
 
 const TVA = 0.06;
@@ -75,10 +75,10 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showCartScanner, setShowCartScanner] = useState(false);
-  const allProductsRef = React.useRef([]);
+  const allProductsRef = useRef([]);
 
   // Démarrer le scanner caisse via useEffect (après rendu DOM)
-  React.useEffect(()=>{
+  useEffect(()=>{
     if(!showCartScanner) return;
     let sc = null;
     const timer = setTimeout(()=>{
