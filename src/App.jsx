@@ -47,6 +47,22 @@ export default function App() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  // PIN & Session
+  const [pinInput, setPinInput] = useState('');
+  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const PIN_CODE = '1234'; // changeable here
+  // Ventes journal
+  const [ventes, setVentes] = useState([]);
+  const [showJournal, setShowJournal] = useState(false);
+  const [journalDate, setJournalDate] = useState(new Date().toISOString().split('T')[0]);
+  // Session caisse
+  const [session, setSession] = useState(null);
+  const [showOpenSession, setShowOpenSession] = useState(false);
+  const [showCloseSession, setShowCloseSession] = useState(false);
+  const [montantOuverture, setMontantOuverture] = useState('');
+  const [montantFermeture, setMontantFermeture] = useState('');
+  const [noteEcart, setNoteEcart] = useState('');
   // Settings
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState('produits');
@@ -71,7 +87,7 @@ export default function App() {
   const [stockAlert, setStockAlert] = useState('5');
   const [boxQuantite, setBoxQuantite] = useState(1);
 
-  useEffect(() => { loadCustomProducts(); loadClients(); loadBoxes(); }, []);
+  useEffect(() => { loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession(); }, []);
 
   const loadCustomProducts = async () => {
     try {
@@ -86,6 +102,24 @@ export default function App() {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=name`, { headers: SB });
       const d = await r.json();
       if (Array.isArray(d)) setAllClients(d);
+    } catch(e) {}
+  };
+
+  const loadVentes = async (date) => {
+    try {
+      const d = date || new Date().toISOString().split('T')[0];
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${d}T00:00:00&date_heure=lte.${d}T23:59:59&order=date_heure.desc&select=*`, { headers: SB });
+      const data = await r.json();
+      if (Array.isArray(data)) setVentes(data);
+    } catch(e) {}
+  };
+
+  const loadCurrentSession = async () => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/sessions_caisse?statut=eq.ouvert&order=created_at.desc&limit=1&select=*`, { headers: SB });
+      const data = await r.json();
+      if (Array.isArray(data) && data.length > 0) setSession(data[0]);
+      else setSession(null);
     } catch(e) {}
   };
 
@@ -243,6 +277,17 @@ export default function App() {
         body: JSON.stringify({cagnotte: Math.max(0,newCag)})
       });
     }
+    // Enregistrer la vente
+    await fetch(`${SUPABASE_URL}/rest/v1/ventes`, {
+      method:'POST', headers:{...SB,Prefer:"return=minimal"},
+      body: JSON.stringify({
+        articles: JSON.stringify(cart),
+        total: finalTotal, paiement: method,
+        remise: discountAmt, cagnotte_used: cagnotteUsed,
+        client_nom: client ? client.name : null,
+        client_id: client ? client.id : null
+      })
+    });
     setReceipt({cart:[...cart], cartTotal, cagnotteUsed, discountAmt, finalTotal, tva, cashback, method, client, date:new Date()});
     setModal('receipt');
   };
@@ -400,6 +445,69 @@ export default function App() {
     `);
   };
 
+  // PIN
+  const tryUnlock = () => {
+    if (pinInput === PIN_CODE) { setPinUnlocked(true); setShowPinModal(false); setShowSettings(true); setPinInput(''); }
+    else { alert('Code PIN incorrect'); setPinInput(''); }
+  };
+
+  // Ouvrir session caisse
+  const ouvrirSession = async () => {
+    const m = parseFloat(montantOuverture.replace(',','.'));
+    if (!m && m!==0) { alert("Entrez un montant"); return; }
+    await fetch(`${SUPABASE_URL}/rest/v1/sessions_caisse`, {
+      method:'POST', headers:{...SB,Prefer:"return=minimal"},
+      body: JSON.stringify({montant_ouverture: m, statut:'ouvert'})
+    });
+    await loadCurrentSession();
+    setShowOpenSession(false); setMontantOuverture('');
+  };
+
+  // Fermer session caisse
+  const fermerSession = async (force=false) => {
+    const mf = parseFloat(montantFermeture.replace(',','.'));
+    if (isNaN(mf)) { alert("Entrez le montant compté"); return; }
+    // Calcul ventes espèces du jour
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`, { headers: SB });
+    const ventesDuJour = await r.json();
+    const especes = (ventesDuJour||[]).filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const carte = (ventesDuJour||[]).filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const attendu = parseFloat(session.montant_ouverture||0) + especes;
+    const ecart = mf - attendu;
+    if (Math.abs(ecart) > 0.01 && !noteEcart.trim() && !force) {
+      alert(`⚠️ Écart de ${ecart.toFixed(2)}€ détecté !
+Expected: ${attendu.toFixed(2)}€
+Compté: ${mf.toFixed(2)}€
+
+Veuillez justifier l'écart dans le champ "Note".`);
+      return;
+    }
+    await fetch(`${SUPABASE_URL}/rest/v1/sessions_caisse?id=eq.${session.id}`, {
+      method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
+      body: JSON.stringify({
+        date_fermeture: new Date().toISOString(),
+        montant_fermeture: mf, ventes_especes: especes, ventes_carte: carte,
+        ecart: ecart, note_ecart: noteEcart||null,
+        statut: force ? 'force' : 'ferme'
+      })
+    });
+    setSession(null); setShowCloseSession(false); setMontantFermeture(''); setNoteEcart('');
+    alert(`✅ Caisse fermée !
+Espèces: ${especes.toFixed(2)}€
+Carte: ${carte.toFixed(2)}€
+Écart: ${ecart.toFixed(2)}€`);
+  };
+
+  // Annuler une vente
+  const annulerVente = async (id, motif) => {
+    if (!motif.trim()) { alert("Motif obligatoire"); return; }
+    await fetch(`${SUPABASE_URL}/rest/v1/ventes?id=eq.${id}`, {
+      method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
+      body: JSON.stringify({annulee:true, note_annulation:motif})
+    });
+    loadVentes(journalDate);
+  };
+
   const sendEmail = async () => {
     if (!emailSubject||!emailBody) { alert("Remplissez tous les champs"); return; }
     setSendingEmail(true);
@@ -446,7 +554,12 @@ export default function App() {
             value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
           <button style={S.btnD} onClick={()=>{setModal('loyalty');setLoySearch('');setLoyResults([]);loadClients();}}>💳</button>
-          <button style={S.btnD} onClick={()=>{setShowSettings(true);loadStock();}}>⚙️</button>
+          {!session
+            ? <button style={{...S.btnD,background:'rgba(255,165,0,0.3)',color:'#ffb74d',fontSize:12,padding:'6px 10px'}} onClick={()=>setShowOpenSession(true)}>🏦 Ouvrir</button>
+            : <button style={{...S.btnD,background:'rgba(76,175,80,0.3)',color:'#81c784',fontSize:12,padding:'6px 10px'}} onClick={()=>setShowCloseSession(true)}>🔒 Fermer</button>
+          }
+          <button style={{...S.btnD,fontSize:12,padding:'6px 10px'}} onClick={()=>{setShowJournal(true);loadVentes(journalDate);}}>📊 Ventes</button>
+          <button style={S.btnD} onClick={()=>{ if(pinUnlocked){setShowSettings(true);loadStock();}else{setShowPinModal(true);} }}>⚙️</button>
         </div>
       </div>
 
@@ -990,6 +1103,133 @@ export default function App() {
               <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:200,height:120,border:'2px solid #e91e8c',borderRadius:8,boxShadow:'0 0 0 1000px rgba(0,0,0,0.3)'}}/>
             </div>
             <button style={S.btnCancel} onClick={stopBarcodeScanner}>✕ Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* PIN MODAL */}
+      {showPinModal && (
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:320,textAlign:'center'}}>
+            <div style={{fontSize:40,marginBottom:8}}>🔐</div>
+            <h2 style={S.mTitle}>Code PIN requis</h2>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:14}}>
+              {['1','2','3','4','5','6','7','8','9','','0','⌫'].map((k,i)=>(
+                <button key={i} style={{...S.qBtn,width:'100%',height:52,fontSize:22,borderRadius:12,background:k?'rgba(255,255,255,0.08)':'transparent',border:k?'1px solid rgba(255,255,255,0.1)':'none'}}
+                  onClick={()=>{if(k==='⌫')setPinInput(p=>p.slice(0,-1));else if(k)setPinInput(p=>p+k);}}>
+                  {k}
+                </button>
+              ))}
+            </div>
+            <div style={{fontSize:28,letterSpacing:12,marginBottom:16,color:'#e91e8c'}}>
+              {'●'.repeat(pinInput.length)}{'○'.repeat(Math.max(0,4-pinInput.length))}
+            </div>
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>{setShowPinModal(false);setPinInput('');}}>Annuler</button>
+              <button style={S.btnConfirm} onClick={tryUnlock}>Valider ✓</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* OUVRIR SESSION */}
+      {showOpenSession && (
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:380}}>
+            <div style={{fontSize:40,textAlign:'center',marginBottom:8}}>🏦</div>
+            <h2 style={S.mTitle}>Ouverture de caisse</h2>
+            <p style={{color:'#888',fontSize:13,textAlign:'center',marginBottom:16}}>Entrez le montant en caisse ce matin</p>
+            <input style={{...S.eInput,fontSize:32,textAlign:'center',fontWeight:900,marginBottom:16,padding:'14px'}}
+              type="number" step="0.01" placeholder="0,00 €"
+              value={montantOuverture} onChange={e=>setMontantOuverture(e.target.value)} autoFocus/>
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>setShowOpenSession(false)}>Annuler</button>
+              <button style={S.btnConfirm} onClick={ouvrirSession}>✅ Ouvrir la caisse</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FERMER SESSION */}
+      {showCloseSession && session && (
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:420}}>
+            <div style={{fontSize:40,textAlign:'center',marginBottom:8}}>🔒</div>
+            <h2 style={S.mTitle}>Fermeture de caisse</h2>
+            <div style={{background:'rgba(255,255,255,0.05)',borderRadius:12,padding:14,marginBottom:16,fontSize:13}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{color:'#888'}}>Fond d'ouverture</span>
+                <span style={{fontWeight:800}}>{parseFloat(session.montant_ouverture||0).toFixed(2)}€</span>
+              </div>
+            </div>
+            <label style={{fontSize:13,color:'#888',fontWeight:700,display:'block',marginBottom:7}}>Montant compté en caisse ce soir</label>
+            <input style={{...S.eInput,fontSize:28,textAlign:'center',fontWeight:900,marginBottom:12,padding:'12px'}}
+              type="number" step="0.01" placeholder="0,00 €"
+              value={montantFermeture} onChange={e=>setMontantFermeture(e.target.value)} autoFocus/>
+            <label style={{fontSize:13,color:'#888',fontWeight:700,display:'block',marginBottom:7}}>Note / justification écart (obligatoire si écart)</label>
+            <textarea style={{...S.eInput,minHeight:70,resize:'vertical',marginBottom:16}}
+              placeholder="Ex: Achat fournitures 50€, monnaie rendue..."
+              value={noteEcart} onChange={e=>setNoteEcart(e.target.value)}/>
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>setShowCloseSession(false)}>Annuler</button>
+              <button style={{...S.btnConfirm,background:'rgba(255,165,0,0.8)'}} onClick={()=>fermerSession(true)}>⚠️ Forcer</button>
+              <button style={S.btnConfirm} onClick={()=>fermerSession(false)}>🔒 Fermer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JOURNAL DES VENTES */}
+      {showJournal && (
+        <div style={S.settingsOverlay}>
+          <div style={S.settingsPanel}>
+            <div style={S.settingsHead}>
+              <span style={{fontWeight:900,fontSize:17}}>📊 Journal des ventes</span>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <input type="date" style={{...S.eInput,width:'auto',padding:'6px 12px'}}
+                  value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
+                <button style={S.settingsClose} onClick={()=>setShowJournal(false)}>✕</button>
+              </div>
+            </div>
+            <div style={{padding:'10px 16px 6px',display:'flex',gap:16,fontSize:13,color:'#888',flexShrink:0}}>
+              <span>💳 Carte: <b style={{color:'#e91e8c'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+              <span>💵 Espèces: <b style={{color:'#4caf50'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+              <span>📦 Total: <b style={{color:'#fff'}}>{ventes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+              <span style={{marginLeft:'auto'}}>{ventes.filter(v=>!v.annulee).length} vente(s)</span>
+            </div>
+            <div style={S.settingsList}>
+              {!ventes.length && <div style={{color:'#888',textAlign:'center',padding:30}}>Aucune vente ce jour</div>}
+              {ventes.map(v=>{
+                const arts = typeof v.articles==='string' ? JSON.parse(v.articles) : v.articles;
+                return (
+                  <div key={v.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:5,opacity:v.annulee?0.4:1}}>
+                    <div style={{display:'flex',justifyContent:'space-between',width:'100%',alignItems:'center'}}>
+                      <div>
+                        <span style={{fontWeight:800,fontSize:14,color:v.paiement==='carte'?'#e91e8c':'#4caf50'}}>
+                          {v.paiement==='carte'?'💳':'💵'} {parseFloat(v.total).toFixed(2)}€
+                        </span>
+                        {v.client_nom && <span style={{fontSize:12,color:'#aaa',marginLeft:10}}>👤 {v.client_nom}</span>}
+                        {v.annulee && <span style={{fontSize:11,color:'#ff5555',marginLeft:10}}>⛔ ANNULÉE</span>}
+                      </div>
+                      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                        <span style={{fontSize:11,color:'#666'}}>{new Date(v.date_heure).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</span>
+                        {!v.annulee && (
+                          <button style={S.delBtn} onClick={()=>{
+                            const motif = prompt("Motif d'annulation (obligatoire) :");
+                            if(motif!==null) annulerVente(v.id, motif);
+                          }}>⛔</button>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{fontSize:11,color:'#777'}}>
+                      {(arts||[]).map(a=>`${a.nom} x${a.qty}`).join(' · ')}
+                    </div>
+                    {v.note_annulation && <div style={{fontSize:11,color:'#ff5555',fontStyle:'italic'}}>Motif: {v.note_annulation}</div>}
+                    {v.remise>0 && <div style={{fontSize:11,color:'#ffa500'}}>Remise: -{parseFloat(v.remise).toFixed(2)}€</div>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
