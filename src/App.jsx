@@ -801,7 +801,7 @@ export default function App() {
       {/* SETTINGS */}
       {showSettings&&(
         <div style={S.settingsOverlay}>
-          <div style={S.settingsPanel}>
+          <div style={S.settingsPanel} className='settings-content'>
             <div style={S.settingsHead}>
               <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
                 <button style={{...S.tabBtn,...(settingsTab==='produits'?S.tabActive:{})}} onClick={()=>setSettingsTab('produits')}>🛍️ Produits</button>
@@ -1428,6 +1428,10 @@ export default function App() {
 
         body{font-family:'Nunito',sans-serif;background:#78B7A0;color:#111}
         button:disabled{opacity:0.4;cursor:not-allowed}
+        /* Settings - texte noir */
+        .settings-content, .settings-content * { color: #111 !important; }
+        .settings-content input, .settings-content textarea, .settings-content select { background: #fff !important; border: 1px solid #ddd !important; color: #111 !important; }
+        .settings-content .keep-white { color: #fff !important; }
         button:active{transform:scale(0.97)}
         select option{background:#14142a;color:#fff}
         input::placeholder{color:rgba(255,255,255,0.4)}
