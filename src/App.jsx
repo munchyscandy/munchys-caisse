@@ -492,7 +492,7 @@ export default function App() {
                     <button style={S.qBtn} onClick={()=>updateQty(item.cartId,1)}>+</button>
                   </>}
                   <span style={{marginLeft:'auto',fontSize:13,fontWeight:800}}>{(item.prix*item.qty).toFixed(2)}€</span>
-                  <button style={S.xBtn} onClick={()=>removeItem(item.cartId)}>✕</button>
+                  <button style={S.xBtn} onClick={()=>confirm(`Supprimer "${item.nom}" ?`)&&removeItem(item.cartId)}>✕</button>
                 </div>
               </div>
             ))}
