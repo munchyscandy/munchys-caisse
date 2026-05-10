@@ -87,11 +87,11 @@ export default function App() {
 
   useEffect(() => {
     loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession();
-    // Précharger Quagga (meilleur pour codes-barres 1D EAN-13)
-    if (!document.getElementById('quagga-script')) {
+    // Précharger html5-qrcode
+    if (!document.getElementById('html5qrcode-script')) {
       const s = document.createElement('script');
-      s.id = 'quagga-script';
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js';
+      s.id = 'html5qrcode-script';
+      s.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
       document.head.appendChild(s);
     }
   }, []);
@@ -1351,7 +1351,7 @@ export default function App() {
                 document.head.appendChild(s);
               }}/>
             <button style={{...S.btnCancel,background:'#eee',color:'#333',border:'1px solid #ccc'}} onClick={()=>{
-              try{if(window._quaggaRunning){window.Quagga.stop();window._quaggaRunning=false;}}catch(e){}
+              try{if(window._cartScanner){window._cartScanner.stop().catch(()=>{});window._cartScanner=null;}}catch(e){}
               window._cartScannerInit=false;window._cartScanned=false;
               setShowCartScanner(false);
             }}>✕ Annuler</button>
