@@ -728,7 +728,13 @@ export default function App() {
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"/>
         </div>
         <div style={S.hRight}>
-          <button style={{...S.btnD,fontSize:20,padding:'8px 14px'}} onClick={()=>setShowCartScanner(true)}>📷</button>
+          <button style={{...S.btnD,fontSize:20,padding:'8px 14px'}} onClick={()=>{
+            if(window._cartScanner){try{window._cartScanner.stop().catch(()=>{});}catch(e){}}
+            window._cartScanner=null;
+            window._cartScannerInit=false;
+            window._cartScanned=false;
+            setShowCartScanner(true);
+          }}>📷</button>
           <input style={{display:'none'}} value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
           <button style={S.btnD} onClick={()=>{setModal('loyalty');setLoySearch('');setLoyResults([]);loadClients();}}>💳</button>
@@ -1355,6 +1361,10 @@ export default function App() {
                 document.head.appendChild(s);
               }}/>
             <button style={{...S.btnCancel,background:'rgba(255,255,255,0.2)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)'}} onClick={()=>{
+              if(window._cartScanner){try{window._cartScanner.stop().catch(()=>{});}catch(e){}}
+              window._cartScanner=null;
+              window._cartScannerInit=false;
+              window._cartScanned=false;
               setShowCartScanner(false);
             }}>✕ Annuler</button>
           </div>
