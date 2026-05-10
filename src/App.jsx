@@ -1286,7 +1286,7 @@ export default function App() {
       )}
 
       {/* BARCODE SCANNER */}
-      {showBarcodeScanner&&editProduct&&(
+      {showBarcodeScanner&&(editProduct||scanMode==='cart')&&(
         <div style={{...S.overlay,zIndex:400}}>
           <div style={{...S.modal,width:400,textAlign:'center'}}>
             <h2 style={S.mTitle}>{scanMode==='cart'?'📷 Scanner un produit':'📷 Enregistrer le code-barres'}</h2>
