@@ -481,39 +481,53 @@ export default function App() {
   };
 
   // Fermer session caisse
-  const fermerSession = async (force=false) => {
-    const mf = parseFloat(montantFermeture.replace(',','.'));
-    if (isNaN(mf)) { alert("Entrez le montant compté"); return; }
-    // Calcul ventes espèces du jour
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`, { headers: SB });
-    const ventesDuJour = await r.json();
-    const especes = (ventesDuJour||[]).filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
-    const carte = (ventesDuJour||[]).filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
-    const attendu = parseFloat(session.montant_ouverture||0) + especes;
-    const ecart = mf - attendu;
-    if (Math.abs(ecart) > 0.01 && !noteEcart.trim() && !force) {
-      alert(`⚠️ Écart de ${ecart.toFixed(2)}€ détecté !
-Expected: ${attendu.toFixed(2)}€
-Compté: ${mf.toFixed(2)}€
-
-Veuillez justifier l'écart dans le champ "Note".`);
+  const fermerSession = async () => {
+    const mf = parseFloat(String(montantFermeture).replace(',','.'));
+    if (montantFermeture === '' || isNaN(mf)) {
+      alert("Vous devez entrer le montant compté en caisse !");
+      return;
+    }
+    let especes = 0; let carte = 0;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${session.date_ouverture}&annulee=eq.false&select=total,paiement`, { headers: SB });
+      const data = await r.json();
+      if (Array.isArray(data)) {
+        especes = data.filter(v=>v.paiement==="espèces").reduce((s,v)=>s+parseFloat(v.total||0),0);
+        carte = data.filter(v=>v.paiement==="carte").reduce((s,v)=>s+parseFloat(v.total||0),0);
+      }
+    } catch(e) {}
+    const ouverture = parseFloat(session.montant_ouverture||0);
+    const attendu = parseFloat((ouverture + especes).toFixed(2));
+    const ecart = parseFloat((mf - attendu).toFixed(2));
+    if (Math.abs(ecart) > 0.01 && !noteEcart.trim()) {
+      alert(
+        "FERMETURE REFUSEE - Ecart detecte\n\n" +
+        "Fond d ouverture : " + ouverture.toFixed(2) + "EUR\n" +
+        "Ventes especes   : +" + especes.toFixed(2) + "EUR\n" +
+        "---------------------------------\n" +
+        "Montant attendu  : " + attendu.toFixed(2) + "EUR\n" +
+        "Montant compte   : " + mf.toFixed(2) + "EUR\n" +
+        "Ecart            : " + (ecart>0?"+":"") + ecart.toFixed(2) + "EUR\n\n" +
+        "Remplissez la note pour justifier et reessayez."
+      );
       return;
     }
     await fetch(`${SUPABASE_URL}/rest/v1/sessions_caisse?id=eq.${session.id}`, {
-      method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
+      method:"PATCH", headers:{...SB,Prefer:"return=minimal"},
       body: JSON.stringify({
         date_fermeture: new Date().toISOString(),
         montant_fermeture: mf, ventes_especes: especes, ventes_carte: carte,
-        ecart: ecart, note_ecart: noteEcart||null,
-        statut: force ? 'force' : 'ferme'
+        ecart, note_ecart: noteEcart||null,
+        statut: Math.abs(ecart)>0.01 ? "ecart_justifie" : "ferme"
       })
     });
-    setSession(null); setShowCloseSession(false); setMontantFermeture(''); setNoteEcart('');
-    alert(`✅ Caisse fermée !
-Espèces: ${especes.toFixed(2)}€
-Carte: ${carte.toFixed(2)}€
-Écart: ${ecart.toFixed(2)}€`);
-  };
+    setSession(null); setShowCloseSession(false); setMontantFermeture(""); setNoteEcart("");
+    if (Math.abs(ecart) > 0.01) {
+      alert("Caisse fermee avec ecart justifie\nEcart: " + (ecart>0?"+":"") + ecart.toFixed(2) + "EUR\nNote: " + noteEcart);
+    } else {
+      alert("Caisse fermee - comptes JUSTES !\nEspeces: " + especes.toFixed(2) + "EUR | Carte: " + carte.toFixed(2) + "EUR");
+    }
+  };;
 
   // Annuler une vente
   const annulerVente = async (id, motif) => {
@@ -1305,8 +1319,7 @@ Carte: ${carte.toFixed(2)}€
               value={noteEcart} onChange={e=>setNoteEcart(e.target.value)}/>
             <div style={S.mBtns}>
               <button style={S.btnCancel} onClick={()=>setShowCloseSession(false)}>Annuler</button>
-              <button style={{...S.btnConfirm,background:'rgba(255,165,0,0.8)'}} onClick={()=>fermerSession(true)}>⚠️ Forcer</button>
-              <button style={S.btnConfirm} onClick={()=>fermerSession(false)}>🔒 Fermer</button>
+              <button style={S.btnConfirm} onClick={()=>fermerSession()}>🔒 Fermer la caisse</button>
             </div>
           </div>
         </div>
