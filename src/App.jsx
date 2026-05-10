@@ -856,9 +856,14 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Nunito',sans-serif;background:#0f0f1a}
-        button:disabled{opacity:0.5}
-        select option{background:#1e1e35;color:#fff}
+        body{font-family:'Nunito',sans-serif;background:#0a0a18}
+        button:disabled{opacity:0.4;cursor:not-allowed}
+        button:active{transform:scale(0.97)}
+        select option{background:#14142a;color:#fff}
+        input::placeholder{color:rgba(255,255,255,0.45)}
+        ::-webkit-scrollbar{width:4px;height:4px}
+        ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(233,30,140,0.3);border-radius:4px}
         @media print{body *{visibility:hidden}#receipt,#receipt *{visibility:visible}#receipt{position:fixed;left:0;top:0;background:white;color:black;padding:20px}}
       `}</style>
     </div>
@@ -866,73 +871,96 @@ export default function App() {
 }
 
 const S = {
-  app:{display:'flex',flexDirection:'column',height:'100vh',background:'#0f0f1a',color:'#fff',fontFamily:"'Nunito',sans-serif",overflow:'hidden'},
-  header:{display:'flex',alignItems:'center',gap:10,padding:'8px 14px',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',boxShadow:'0 4px 20px rgba(233,30,140,0.4)',flexShrink:0},
-  logo:{fontSize:20,fontWeight:900,color:'#fff',whiteSpace:'nowrap'},
-  hRight:{display:'flex',gap:7,alignItems:'center',flexShrink:0},
-  searchInput:{width:'100%',padding:'8px 14px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.2)',color:'#fff',fontSize:14,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:'none'},
-  barcodeInput:{width:140,padding:'7px 10px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontSize:13,outline:'none'},
-  btnW:{padding:'7px 12px',borderRadius:10,border:'none',background:'#fff',color:'#e91e8c',fontWeight:800,fontSize:14,cursor:'pointer'},
-  btnD:{padding:'7px 12px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontWeight:700,fontSize:14,cursor:'pointer'},
+  // App shell
+  app:{display:'flex',flexDirection:'column',height:'100vh',background:'linear-gradient(160deg,#0a0a18 0%,#12122a 100%)',color:'#fff',fontFamily:"'Nunito',sans-serif",overflow:'hidden'},
+  
+  // Header - premium glassmorphism
+  header:{display:'flex',alignItems:'center',gap:12,padding:'10px 18px',background:'linear-gradient(135deg,#e91e8c 0%,#9c27b0 50%,#ff6b35 100%)',boxShadow:'0 4px 30px rgba(233,30,140,0.5)',flexShrink:0,borderBottom:'1px solid rgba(255,255,255,0.15)'},
+  logo:{fontSize:22,fontWeight:900,color:'#fff',whiteSpace:'nowrap',letterSpacing:'-0.5px',textShadow:'0 2px 8px rgba(0,0,0,0.3)'},
+  hRight:{display:'flex',gap:8,alignItems:'center',flexShrink:0},
+  searchInput:{width:'100%',padding:'9px 16px',borderRadius:14,border:'2px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.15)',color:'#fff',fontSize:14,fontFamily:"'Nunito',sans-serif",fontWeight:600,outline:'none',backdropFilter:'blur(10px)',transition:'border 0.2s'},
+  barcodeInput:{width:150,padding:'8px 12px',borderRadius:12,border:'2px solid rgba(255,255,255,0.15)',background:'rgba(0,0,0,0.25)',color:'#fff',fontSize:13,outline:'none',backdropFilter:'blur(5px)'},
+  btnW:{padding:'8px 14px',borderRadius:12,border:'none',background:'rgba(255,255,255,0.95)',color:'#e91e8c',fontWeight:800,fontSize:14,cursor:'pointer',boxShadow:'0 2px 10px rgba(0,0,0,0.2)',transition:'transform 0.1s'},
+  btnD:{padding:'8px 14px',borderRadius:12,border:'2px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:700,fontSize:14,cursor:'pointer',backdropFilter:'blur(5px)'},
+  
+  // Main layout
   main:{display:'flex',flex:1,overflow:'hidden'},
   left:{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'},
-  catBar:{display:'flex',gap:5,padding:'8px 10px',overflowX:'auto',flexShrink:0,background:'#16162a',borderBottom:'1px solid rgba(255,255,255,0.08)',scrollbarWidth:'none'},
-  catBtn:{padding:'5px 10px',borderRadius:20,border:'2px solid transparent',background:'rgba(255,255,255,0.07)',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap'},
-  catActive:{background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff'},
-  grid:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(118px,1fr))',gap:7,padding:10,overflowY:'auto',flex:1,alignContent:'start'},
-  card:{background:'linear-gradient(145deg,#1e1e35,#252540)',border:'1px solid rgba(255,255,255,0.08)',borderRadius:12,padding:'10px 7px',cursor:'pointer',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:3},
-  cardVrac:{background:'linear-gradient(145deg,#2a1a35,#3a1550)',border:'1px solid rgba(233,30,140,0.3)'},
-  cardImg:{width:52,height:52,objectFit:'cover',borderRadius:8,marginBottom:2},
-  cardName:{fontSize:10,fontWeight:700,color:'#ddd',lineHeight:1.2,maxHeight:28,overflow:'hidden'},
-  cardPrice:{fontSize:13,fontWeight:900,color:'#e91e8c',marginTop:2},
-  right:{width:305,background:'#16162a',borderLeft:'1px solid rgba(255,255,255,0.08)',display:'flex',flexDirection:'column'},
-  cartHead:{padding:'10px 12px',fontWeight:900,fontSize:15,background:'linear-gradient(135deg,#1e1e35,#252540)',borderBottom:'1px solid rgba(255,255,255,0.08)',flexShrink:0},
-  loyCard:{background:'rgba(233,30,140,0.08)',border:'1px solid rgba(233,30,140,0.2)',borderRadius:10,padding:'7px 10px',marginTop:8},
-  btnX:{background:'transparent',border:'none',color:'#aaa',cursor:'pointer',fontSize:14,fontWeight:700},
-  cogBtn:{flex:1,padding:'5px 8px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'transparent',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer'},
-  cogOn:{background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',border:'none'},
-  cogOff:{background:'rgba(255,255,255,0.05)',color:'#888'},
-  emailBtn:{width:'100%',marginTop:5,padding:'4px',borderRadius:8,border:'1px solid rgba(255,255,255,0.1)',background:'transparent',color:'#aaa',fontWeight:700,fontSize:11,cursor:'pointer'},
-  items:{flex:1,overflowY:'auto',padding:'7px 10px',display:'flex',flexDirection:'column',gap:5},
-  empty:{color:'#555',textAlign:'center',padding:25,fontSize:13},
-  item:{background:'rgba(255,255,255,0.04)',borderRadius:9,padding:'7px 9px',display:'flex',flexDirection:'column',gap:3},
-  iName:{fontSize:11,fontWeight:700,color:'#ddd'},
-  iRow:{display:'flex',alignItems:'center',gap:5},
-  qBtn:{width:24,height:24,borderRadius:7,border:'none',background:'rgba(233,30,140,0.2)',color:'#e91e8c',fontWeight:900,cursor:'pointer',fontSize:15},
-  qNum:{fontSize:13,fontWeight:800,minWidth:18,textAlign:'center'},
-  xBtn:{width:20,height:20,borderRadius:5,border:'none',background:'rgba(255,50,50,0.2)',color:'#ff5555',fontWeight:700,cursor:'pointer',fontSize:10},
-  footer:{padding:11,borderTop:'1px solid rgba(255,255,255,0.08)',display:'flex',flexDirection:'column',gap:6,flexShrink:0},
-  discRow:{display:'flex',justifyContent:'space-between',fontSize:12,color:'#e91e8c',fontWeight:700},
-  totalRow:{display:'flex',justifyContent:'space-between',alignItems:'center'},
-  totalAmt:{fontSize:26,fontWeight:900},
-  tvaRow:{display:'flex',justifyContent:'space-between',fontSize:10,color:'#666'},
-  payBtn:{flex:1,padding:'11px 5px',borderRadius:12,border:'none',fontWeight:900,fontSize:14,cursor:'pointer'},
-  payCard:{background:'linear-gradient(135deg,#e91e8c,#c2185b)',color:'#fff'},
-  payCash:{background:'linear-gradient(135deg,#4caf50,#388e3c)',color:'#fff'},
-  remiseBtn:{flex:1,padding:'7px',borderRadius:8,border:'1px solid rgba(255,165,0,0.3)',background:'rgba(255,165,0,0.1)',color:'#ffa500',fontWeight:700,fontSize:12,cursor:'pointer'},
-  clearRemise:{padding:'7px 10px',borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'rgba(255,50,50,0.1)',color:'#ff5555',fontWeight:700,fontSize:12,cursor:'pointer'},
-  clearBtn:{padding:7,borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'transparent',color:'#ff5555',fontWeight:700,fontSize:12,cursor:'pointer'},
-  settingsOverlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.9)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center'},
-  settingsPanel:{width:'95%',maxWidth:750,background:'#1a1a2e',display:'flex',flexDirection:'column',height:'90vh',borderRadius:16,overflow:'hidden',border:'1px solid rgba(255,255,255,0.1)'},
-  settingsHead:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',flexShrink:0},
-  tabBtn:{padding:'6px 14px',borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'transparent',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer'},
-  tabActive:{background:'rgba(255,255,255,0.3)',border:'1px solid rgba(255,255,255,0.5)'},
-  settingsClose:{padding:'6px 12px',borderRadius:8,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:15},
-  btnAdd:{padding:'6px 14px',borderRadius:8,border:'none',background:'#fff',color:'#e91e8c',fontWeight:800,cursor:'pointer',fontSize:13},
-  settingsSearch:{margin:'10px 14px 6px',padding:'9px 14px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:13,outline:'none',flexShrink:0},
-  settingsList:{flex:1,overflowY:'auto',padding:'0 10px 10px'},
-  sItem:{display:'flex',alignItems:'center',gap:10,padding:'9px',borderRadius:10,marginBottom:5,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'},
-  sThumb:{width:40,height:40,objectFit:'cover',borderRadius:8,flexShrink:0},
-  editBtn:{padding:'5px 9px',borderRadius:7,border:'none',background:'rgba(233,30,140,0.2)',color:'#e91e8c',fontWeight:700,cursor:'pointer',fontSize:13},
-  delBtn:{padding:'5px 8px',borderRadius:7,border:'none',background:'rgba(255,50,50,0.2)',color:'#ff5555',fontWeight:700,cursor:'pointer',fontSize:13},
-  overlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,backdropFilter:'blur(4px)'},
-  modal:{background:'#1e1e35',borderRadius:18,padding:24,width:420,maxWidth:'95vw',boxShadow:'0 20px 60px rgba(0,0,0,0.8)',border:'1px solid rgba(255,255,255,0.1)'},
-  mTitle:{fontSize:20,fontWeight:900,marginBottom:16,textAlign:'center'},
-  mBtns:{display:'flex',gap:8},
-  btnCancel:{flex:1,padding:11,borderRadius:10,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'#aaa',fontWeight:700,cursor:'pointer'},
-  btnConfirm:{flex:1,padding:11,borderRadius:10,border:'none',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',fontWeight:800,cursor:'pointer'},
-  eGrid:{display:'grid',gridTemplateColumns:'85px 1fr',gap:'11px 12px',marginBottom:16,alignItems:'start'},
-  eLabel:{fontSize:13,color:'#aaa',fontWeight:700,textAlign:'right',paddingTop:8},
-  eInput:{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.07)',color:'#fff',fontSize:14,outline:'none',width:'100%'},
-  uploadBtn:{display:'inline-block',padding:'8px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#e91e8c,#ff6b35)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center'},
+  
+  // Category bar - colorful pills
+  catBar:{display:'flex',gap:6,padding:'10px 12px',overflowX:'auto',flexShrink:0,background:'rgba(255,255,255,0.03)',borderBottom:'1px solid rgba(255,255,255,0.06)',scrollbarWidth:'none'},
+  catBtn:{padding:'6px 14px',borderRadius:24,border:'none',background:'rgba(255,255,255,0.06)',color:'#bbb',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap',transition:'all 0.2s',letterSpacing:'0.3px'},
+  catActive:{background:'linear-gradient(135deg,#e91e8c,#9c27b0)',color:'#fff',boxShadow:'0 4px 15px rgba(233,30,140,0.4)',transform:'translateY(-1px)'},
+  
+  // Product grid - beautiful cards
+  grid:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(125px,1fr))',gap:10,padding:12,overflowY:'auto',flex:1,alignContent:'start'},
+  card:{background:'linear-gradient(145deg,rgba(30,30,60,0.9),rgba(40,40,80,0.8))',border:'1px solid rgba(255,255,255,0.08)',borderRadius:16,padding:'14px 10px 10px',cursor:'pointer',textAlign:'center',display:'flex',flexDirection:'column',alignItems:'center',gap:4,boxShadow:'0 4px 15px rgba(0,0,0,0.3)',backdropFilter:'blur(5px)',transition:'all 0.15s'},
+  cardVrac:{background:'linear-gradient(145deg,rgba(60,20,80,0.9),rgba(100,30,120,0.8))',border:'1px solid rgba(233,30,140,0.4)',boxShadow:'0 4px 15px rgba(233,30,140,0.2)'},
+  cardImg:{width:58,height:58,objectFit:'cover',borderRadius:12,marginBottom:3,boxShadow:'0 4px 12px rgba(0,0,0,0.4)'},
+  cardName:{fontSize:11,fontWeight:700,color:'#e0e0ff',lineHeight:1.2,maxHeight:30,overflow:'hidden'},
+  cardPrice:{fontSize:14,fontWeight:900,color:'#ff6b9d',marginTop:3,letterSpacing:'-0.3px'},
+  
+  // Right panel - cart
+  right:{width:310,background:'rgba(10,10,30,0.95)',borderLeft:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',backdropFilter:'blur(20px)'},
+  cartHead:{padding:'12px 14px',fontWeight:900,fontSize:16,background:'linear-gradient(135deg,rgba(233,30,140,0.15),rgba(156,39,176,0.1))',borderBottom:'1px solid rgba(255,255,255,0.06)',flexShrink:0,letterSpacing:'-0.3px'},
+  
+  // Loyalty card in cart
+  loyCard:{background:'linear-gradient(135deg,rgba(233,30,140,0.1),rgba(156,39,176,0.08))',border:'1px solid rgba(233,30,140,0.25)',borderRadius:12,padding:'8px 12px',marginTop:8,boxShadow:'0 2px 10px rgba(233,30,140,0.1)'},
+  btnX:{background:'transparent',border:'none',color:'#666',cursor:'pointer',fontSize:16,fontWeight:700,lineHeight:1},
+  cogBtn:{flex:1,padding:'6px 8px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'#888',fontWeight:700,fontSize:11,cursor:'pointer',transition:'all 0.2s'},
+  cogOn:{background:'linear-gradient(135deg,#e91e8c,#9c27b0)',color:'#fff',border:'none',boxShadow:'0 2px 8px rgba(233,30,140,0.3)'},
+  cogOff:{background:'rgba(255,255,255,0.04)',color:'#666'},
+  emailBtn:{width:'100%',marginTop:6,padding:'5px',borderRadius:8,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#888',fontWeight:700,fontSize:11,cursor:'pointer',transition:'background 0.2s'},
+  
+  // Cart items
+  items:{flex:1,overflowY:'auto',padding:'8px 10px',display:'flex',flexDirection:'column',gap:6},
+  empty:{color:'#3a3a5a',textAlign:'center',padding:30,fontSize:14},
+  item:{background:'rgba(255,255,255,0.05)',borderRadius:12,padding:'8px 10px',display:'flex',flexDirection:'column',gap:4,border:'1px solid rgba(255,255,255,0.05)'},
+  iName:{fontSize:12,fontWeight:700,color:'#c0c0e0'},
+  iRow:{display:'flex',alignItems:'center',gap:6},
+  qBtn:{width:26,height:26,borderRadius:8,border:'none',background:'linear-gradient(135deg,rgba(233,30,140,0.3),rgba(156,39,176,0.2))',color:'#e91e8c',fontWeight:900,cursor:'pointer',fontSize:16,boxShadow:'0 1px 4px rgba(233,30,140,0.2)'},
+  qNum:{fontSize:14,fontWeight:800,minWidth:20,textAlign:'center',color:'#fff'},
+  xBtn:{width:22,height:22,borderRadius:6,border:'none',background:'rgba(255,50,50,0.15)',color:'#ff6b6b',fontWeight:700,cursor:'pointer',fontSize:11},
+  
+  // Cart footer
+  footer:{padding:12,borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',gap:7,flexShrink:0,background:'rgba(0,0,0,0.2)'},
+  discRow:{display:'flex',justifyContent:'space-between',fontSize:12,color:'#ff6b9d',fontWeight:700,padding:'2px 0'},
+  totalRow:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0'},
+  totalAmt:{fontSize:28,fontWeight:900,color:'#fff',letterSpacing:'-1px',textShadow:'0 0 20px rgba(233,30,140,0.3)'},
+  tvaRow:{display:'flex',justifyContent:'space-between',fontSize:10,color:'#444'},
+  
+  // Payment buttons - large and prominent
+  payBtn:{flex:1,padding:'13px 5px',borderRadius:14,border:'none',fontWeight:900,fontSize:15,cursor:'pointer',letterSpacing:'-0.3px',boxShadow:'0 4px 15px rgba(0,0,0,0.3)',transition:'transform 0.1s'},
+  payCard:{background:'linear-gradient(135deg,#e91e8c,#c2185b)',color:'#fff',boxShadow:'0 4px 20px rgba(233,30,140,0.5)'},
+  payCash:{background:'linear-gradient(135deg,#00c853,#2e7d32)',color:'#fff',boxShadow:'0 4px 20px rgba(0,200,83,0.4)'},
+  remiseBtn:{flex:1,padding:'8px',borderRadius:10,border:'1px solid rgba(255,165,0,0.3)',background:'linear-gradient(135deg,rgba(255,165,0,0.1),rgba(255,120,0,0.08))',color:'#ffb74d',fontWeight:700,fontSize:12,cursor:'pointer'},
+  clearRemise:{padding:'8px 10px',borderRadius:10,border:'1px solid rgba(255,50,50,0.3)',background:'rgba(255,50,50,0.08)',color:'#ff6b6b',fontWeight:700,fontSize:12,cursor:'pointer'},
+  clearBtn:{padding:8,borderRadius:10,border:'1px solid rgba(255,50,50,0.15)',background:'rgba(255,50,50,0.05)',color:'#ff4444',fontWeight:700,fontSize:12,cursor:'pointer'},
+  
+  // Settings panel
+  settingsOverlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(8px)'},
+  settingsPanel:{width:'95%',maxWidth:780,background:'linear-gradient(145deg,#0f0f25,#1a1a35)',display:'flex',flexDirection:'column',height:'92vh',borderRadius:20,overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 30px 80px rgba(0,0,0,0.8)'},
+  settingsHead:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'16px 20px',background:'linear-gradient(135deg,#e91e8c,#9c27b0,#ff6b35)',flexShrink:0},
+  tabBtn:{padding:'7px 16px',borderRadius:10,border:'2px solid rgba(255,255,255,0.25)',background:'rgba(255,255,255,0.08)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer',backdropFilter:'blur(5px)',transition:'all 0.2s'},
+  tabActive:{background:'rgba(255,255,255,0.95)',color:'#e91e8c',border:'2px solid transparent',boxShadow:'0 2px 10px rgba(0,0,0,0.3)'},
+  settingsClose:{padding:'7px 14px',borderRadius:10,border:'none',background:'rgba(0,0,0,0.3)',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:16},
+  btnAdd:{padding:'7px 16px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.95)',color:'#e91e8c',fontWeight:800,cursor:'pointer',fontSize:13,boxShadow:'0 2px 8px rgba(0,0,0,0.2)'},
+  settingsSearch:{margin:'12px 16px 6px',padding:'10px 16px',borderRadius:12,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.05)',color:'#fff',fontSize:13,outline:'none',flexShrink:0,transition:'border 0.2s'},
+  settingsList:{flex:1,overflowY:'auto',padding:'4px 12px 12px'},
+  sItem:{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderRadius:12,marginBottom:6,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.05)',transition:'background 0.2s'},
+  sThumb:{width:44,height:44,objectFit:'cover',borderRadius:10,flexShrink:0,boxShadow:'0 2px 8px rgba(0,0,0,0.3)'},
+  editBtn:{padding:'6px 10px',borderRadius:8,border:'none',background:'rgba(233,30,140,0.15)',color:'#ff6b9d',fontWeight:700,cursor:'pointer',fontSize:14,transition:'background 0.2s'},
+  delBtn:{padding:'6px 9px',borderRadius:8,border:'none',background:'rgba(255,50,50,0.15)',color:'#ff6b6b',fontWeight:700,cursor:'pointer',fontSize:14},
+  
+  // Modals
+  overlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,backdropFilter:'blur(12px)'},
+  modal:{background:'linear-gradient(145deg,#14142a,#1e1e3a)',borderRadius:20,padding:26,width:430,maxWidth:'95vw',boxShadow:'0 30px 80px rgba(0,0,0,0.9)',border:'1px solid rgba(255,255,255,0.08)'},
+  mTitle:{fontSize:21,fontWeight:900,marginBottom:18,textAlign:'center',letterSpacing:'-0.5px'},
+  mBtns:{display:'flex',gap:10},
+  btnCancel:{flex:1,padding:12,borderRadius:12,border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.04)',color:'#888',fontWeight:700,cursor:'pointer',fontSize:14,transition:'background 0.2s'},
+  btnConfirm:{flex:1,padding:12,borderRadius:12,border:'none',background:'linear-gradient(135deg,#e91e8c,#9c27b0)',color:'#fff',fontWeight:800,cursor:'pointer',fontSize:14,boxShadow:'0 4px 15px rgba(233,30,140,0.4)',transition:'transform 0.1s'},
+  eGrid:{display:'grid',gridTemplateColumns:'90px 1fr',gap:'12px 14px',marginBottom:18,alignItems:'start'},
+  eLabel:{fontSize:13,color:'#888',fontWeight:700,textAlign:'right',paddingTop:9},
+  eInput:{padding:'9px 14px',borderRadius:10,border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.06)',color:'#fff',fontSize:14,outline:'none',width:'100%',transition:'border 0.2s'},
+  uploadBtn:{display:'inline-block',padding:'9px 16px',borderRadius:10,border:'none',background:'linear-gradient(135deg,#e91e8c,#9c27b0)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center',boxShadow:'0 2px 10px rgba(233,30,140,0.3)'},
 };
