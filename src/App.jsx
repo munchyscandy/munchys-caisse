@@ -75,6 +75,7 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showCartScanner, setShowCartScanner] = useState(false);
+  const allProductsRef = React.useRef([]);
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
@@ -222,6 +223,8 @@ export default function App() {
     }));
     return [...custom,...base];
   })();
+
+  allProductsRef.current = allProducts;
 
   const filtered = allProducts.filter(p=>{
     const cat = activeCat==="TOUT"||p.categorie===activeCat;
@@ -1331,7 +1334,7 @@ export default function App() {
                       if(window._cartScanned) return;
                       window._cartScanned=true;
                       const codeStr = String(code).trim();
-                      const found = allProducts.find(p=>p.barcode&&String(p.barcode).trim()===codeStr);
+                      const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===codeStr);
                       sc.stop().then(()=>{
                         window._cartScanner=null;
                         window._cartScannerInit=false;
@@ -1542,3 +1545,4 @@ const S = {
   eInput:{padding:'9px 12px',borderRadius:8,border:'1px solid #ddd',background:'#fafafa',color:'#111',fontSize:14,outline:'none',width:'100%'},
   uploadBtn:{display:'inline-block',padding:'9px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#D3518B,#78B7A0)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center'},
 };
+  
