@@ -279,7 +279,7 @@ export default function App() {
       prix:parseFloat(String(editProduct.prix).replace(',','.')),
       vrac:editProduct.vrac, barcode:editProduct.barcode||null,
       photo_url:editProduct.photo_url||null, actif:true,
-      base_product_id:editProduct.base_product_id||null
+      base_product_id:editProduct.base_product_id!=null?editProduct.base_product_id:null
     };
     try {
       if (editProduct.custom_id) {
@@ -297,9 +297,18 @@ export default function App() {
   };
 
   const deleteProduct = async (cid) => {
-    if (!confirm("Supprimer ?")) return;
+    if (!confirm("Supprimer définitivement ?")) return;
     await fetch(`${SUPABASE_URL}/rest/v1/products_custom?id=eq.${cid}`, {
       method:'PATCH', headers:{...SB,Prefer:"return=minimal"}, body:JSON.stringify({actif:false})
+    });
+    loadCustomProducts();
+  };
+
+  const hideBaseProduct = async (p) => {
+    if (!confirm(`Masquer "${p.nom}" du catalogue ?`)) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/products_custom`, {
+      method:'POST', headers:{...SB,Prefer:"return=minimal"},
+      body:JSON.stringify({nom:p.nom,categorie:p.categorie,prix:p.prix,vrac:p.vrac,barcode:p.barcode||null,photo_url:p.photo_url||null,actif:false,base_product_id:typeof p.id==='number'?p.id:null})
     });
     loadCustomProducts();
   };
@@ -419,7 +428,7 @@ export default function App() {
             value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
           <button style={S.btnD} onClick={()=>{setModal('loyalty');setLoySearch('');setLoyResults([]);loadClients();}}>💳</button>
-          <button style={S.btnD} onClick={()=>setShowSettings(true)}>⚙️</button>
+          <button style={S.btnD} onClick={()=>{setShowSettings(true);loadStock();}}>⚙️</button>
         </div>
       </div>
 
@@ -550,7 +559,10 @@ export default function App() {
                       </div>
                       <div style={{display:'flex',gap:5,flexShrink:0}}>
                         <button style={S.editBtn} onClick={()=>openEdit(p)}>✏️</button>
-                        {p.custom_id && <button style={S.delBtn} onClick={()=>deleteProduct(p.custom_id)}>🗑️</button>}
+                        {p.custom_id
+                          ? <button style={S.delBtn} onClick={()=>deleteProduct(p.custom_id)}>🗑️</button>
+                          : <button style={S.delBtn} title="Masquer du catalogue" onClick={()=>hideBaseProduct(p)}>🙈</button>
+                        }
                       </div>
                     </div>
                   ))}
@@ -586,6 +598,71 @@ export default function App() {
                 })}
               </div>
             )}
+
+            {/* STOCK TAB */}
+            {settingsTab==='stock' && (
+              <>
+                <input style={S.settingsSearch} placeholder="Rechercher un produit..." value={stockSearch} onChange={e=>setStockSearch(e.target.value)} autoComplete="off"/>
+                <div style={{padding:'4px 16px 8px',fontSize:12,color:'#888'}}>{allProducts.length} produits · Cliquez pour modifier le stock · 🟢 OK · 🟡 Bas · 🔴 Vide · ⬜ Non saisi</div>
+                <div style={S.settingsList}>
+                  {allProducts.filter(p=>!stockSearch||p.nom.toLowerCase().includes(stockSearch.toLowerCase())).slice(0,300).map(p=>{
+                    const s = stockData.find(sd=>sd.product_nom===p.nom);
+                    const qty = s ? s.quantite : null;
+                    const seuil = s ? s.seuil_alerte : 5;
+                    const dot = qty===null?'⬜':qty<=0?'🔴':qty<=seuil?'🟡':'🟢';
+                    const color = qty===null?'#555':qty<=0?'#ff5555':qty<=seuil?'#ffa500':'#4caf50';
+                    return (
+                      <div key={p.id} style={{...S.sItem,cursor:'pointer'}}
+                        onClick={()=>{setEditingStock(p);setStockQty(qty!==null?String(qty):'0');setStockAlert(String(seuil));}}>
+                        <div style={{fontSize:20,width:30,textAlign:'center',flexShrink:0}}>{dot}</div>
+                        <div style={{flex:1,overflow:'hidden'}}>
+                          <div style={{fontSize:13,fontWeight:700,color:'#ddd',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
+                          <div style={{fontSize:11,color:'#777'}}>{p.categorie}</div>
+                        </div>
+                        <div style={{textAlign:'right',flexShrink:0,marginRight:8}}>
+                          <div style={{fontSize:20,fontWeight:900,color,lineHeight:1}}>{qty!==null?qty:'—'}</div>
+                          <div style={{fontSize:10,color:'#555'}}>unités</div>
+                        </div>
+                        {s && qty>0 && (
+                          <button style={{...S.editBtn,background:'rgba(76,175,80,0.15)',color:'#4caf50',fontSize:12,padding:'5px 8px'}}
+                            onClick={e=>{
+                              e.stopPropagation();
+                              const n=parseInt(prompt(`Ajouter combien d'unités à "${p.nom}" ?`)||'0');
+                              if(n>0) addStock(p.nom,n);
+                            }}>+</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* EDIT STOCK MODAL */}
+      {editingStock && (
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:380}}>
+            <h2 style={S.mTitle}>📊 {editingStock.nom}</h2>
+            <div style={{display:'flex',flexDirection:'column',gap:14,marginBottom:18}}>
+              <div>
+                <label style={{fontSize:13,color:'#888',fontWeight:700,display:'block',marginBottom:7}}>Quantité actuelle en stock</label>
+                <input style={{...S.eInput,fontSize:32,textAlign:'center',fontWeight:900,padding:'14px'}} type="number" min="0" value={stockQty} onChange={e=>setStockQty(e.target.value)} autoFocus/>
+              </div>
+              <div>
+                <label style={{fontSize:13,color:'#888',fontWeight:700,display:'block',marginBottom:7}}>Seuil d'alerte stock bas</label>
+                <input style={S.eInput} type="number" min="0" value={stockAlert} onChange={e=>setStockAlert(e.target.value)} placeholder="Ex: 5"/>
+              </div>
+            </div>
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>setEditingStock(null)}>Annuler</button>
+              <button style={S.btnConfirm} onClick={async()=>{
+                await upsertStock(editingStock.nom,parseInt(stockQty)||0,parseInt(stockAlert)||5);
+                setEditingStock(null);
+              }}>💾 Sauvegarder</button>
+            </div>
           </div>
         </div>
       )}
