@@ -77,41 +77,7 @@ export default function App() {
   const [showCartScanner, setShowCartScanner] = useState(false);
   const allProductsRef = useRef([]);
 
-  // Démarrer le scanner caisse via useEffect (après rendu DOM)
-  useEffect(()=>{
-    if(!showCartScanner) return;
-    let sc = null;
-    const timer = setTimeout(()=>{
-      const startScan = () => {
-        sc = new window.Html5Qrcode('cart-barcode-reader');
-        window._cartScanner = sc;
-        sc.start(
-          {facingMode:'environment'},
-          {fps:15, qrbox:{width:280,height:100}},
-          (code)=>{
-            const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
-            if(sc){sc.stop().catch(()=>{});}
-            setShowCartScanner(false);
-            if(found){ addToCart(found); }
-            else { alert('❌ Code '+code+' non trouvé\nAssociez-le dans ⚙️ → Produits'); }
-          },
-          ()=>{}
-        ).catch(e=>{ alert('❌ Caméra: '+e); setShowCartScanner(false); });
-      };
-      if(window.Html5Qrcode){ startScan(); }
-      else {
-        const s=document.createElement('script');
-        s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-        s.onload=startScan;
-        document.head.appendChild(s);
-      }
-    }, 300);
-    return ()=>{
-      clearTimeout(timer);
-      if(sc){try{sc.stop().catch(()=>{});}catch(e){}}
-      window._cartScanner=null;
-    };
-  }, [showCartScanner]);
+
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
@@ -1359,7 +1325,33 @@ export default function App() {
             <h2 style={{...S.mTitle,color:'#fff'}}>📷 Scanner un produit</h2>
             <p style={{color:'#aaa',fontSize:13,marginBottom:14}}>Pointez vers le code-barres</p>
             <div id="cart-barcode-reader" style={{width:'100%',marginBottom:14,borderRadius:12,overflow:'hidden',background:'#000',minHeight:220}}
-              ref={()=>{
+              ref={el=>{
+                if(!el||window._cartScannerInit) return;
+                window._cartScannerInit=true;
+                const startCartScan=()=>{
+                  const sc=new window.Html5Qrcode('cart-barcode-reader');
+                  window._cartScanner=sc;
+                  sc.start({facingMode:'environment'},{fps:15,qrbox:{width:280,height:100}},
+                    (code)=>{
+                      if(window._cartScanned) return;
+                      window._cartScanned=true;
+                      const found=allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
+                      sc.stop().then(()=>{
+                        window._cartScanner=null;window._cartScannerInit=false;window._cartScanned=false;
+                        setShowCartScanner(false);
+                        if(found){addToCart(found);}
+                        else{alert('Code non trouve - associez le barcode dans Produits');}
+                      }).catch(()=>{});
+                    },()=>{})
+                  .catch(e=>{alert('❌ Caméra: '+e);setShowCartScanner(false);});
+                };
+                if(window.Html5Qrcode){startCartScan();}
+                else{
+                  const s=document.createElement('script');
+                  s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+                  s.onload=startCartScan;
+                  document.head.appendChild(s);
+                }
                 document.head.appendChild(s);
               }}/>
             <button style={{...S.btnCancel,background:'rgba(255,255,255,0.2)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)'}} onClick={()=>{
