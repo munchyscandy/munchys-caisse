@@ -75,6 +75,7 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showCartScanner, setShowCartScanner] = useState(false);
+  const [scanMode, setScanMode] = useState('product'); // 'product' or 'cart'
   const allProductsRef = useRef([]);
 
 
@@ -729,11 +730,12 @@ export default function App() {
         </div>
         <div style={S.hRight}>
           <button style={{...S.btnD,fontSize:20,padding:'8px 14px'}} onClick={()=>{
-            if(window._cartScanner){try{window._cartScanner.stop().catch(()=>{});}catch(e){}}
-            window._cartScanner=null;
-            window._cartScannerInit=false;
-            window._cartScanned=false;
-            setShowCartScanner(true);
+            window._scannerInit=false;
+            window._scanned=false;
+            if(window._html5QrCode){try{window._html5QrCode.stop().catch(()=>{});}catch(e){}}
+            window._html5QrCode=null;
+            setScanMode('cart');
+            setShowBarcodeScanner(true);
           }}>📷</button>
           <input style={{display:'none'}} value={barcode} onChange={e=>setBarcode(e.target.value)} onKeyDown={handleBarcode}/>
           <button style={S.btnW} onClick={()=>setModal('vrac')}>⚖️</button>
@@ -1287,7 +1289,7 @@ export default function App() {
       {showBarcodeScanner&&editProduct&&(
         <div style={{...S.overlay,zIndex:400}}>
           <div style={{...S.modal,width:400,textAlign:'center'}}>
-            <h2 style={S.mTitle}>📷 Scanner le code-barres</h2>
+            <h2 style={S.mTitle}>{scanMode==='cart'?'📷 Scanner un produit':'📷 Enregistrer le code-barres'}</h2>
             <p style={{color:'#888',fontSize:13,marginBottom:14}}>Pointez la caméra vers le code-barres</p>
             <div id="barcode-reader" style={{width:"100%",marginBottom:14,borderRadius:12,overflow:"hidden",background:"#000",minHeight:220}}
               ref={el=>{
@@ -1305,7 +1307,16 @@ export default function App() {
                         window._scannerInit=false;
                         window._scanned=false;
                         setShowBarcodeScanner(false);
-                        setEditProduct(p=>({...p,barcode:code}));
+                        setScanMode(prev=>{
+                          if(prev==='cart'){
+                            const found=allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
+                            if(found){addToCart(found);}
+                            else{alert('Code '+code+' non trouvé - associez-le dans Produits');}
+                          } else {
+                            setEditProduct(p=>({...p,barcode:code}));
+                          }
+                          return 'product';
+                        });
                       }).catch(()=>{});
                     },
                     ()=>{})
@@ -1324,8 +1335,8 @@ export default function App() {
         </div>
       )}
 
-      {/* CART SCANNER - scan pour ajouter au panier */}
-      {showCartScanner&&(
+      {/* CART SCANNER - désactivé, utilise showBarcodeScanner en mode cart */}
+      {false&&(
         <div style={{...S.overlay,zIndex:350}}>
           <div style={{...S.modal,width:420,textAlign:'center',background:'#1a1a2e'}}>
             <h2 style={{...S.mTitle,color:'#fff'}}>📷 Scanner un produit</h2>
