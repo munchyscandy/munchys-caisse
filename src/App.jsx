@@ -75,7 +75,7 @@ export default function App() {
 
   const loadCustomProducts = async () => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/products_custom?actif=eq.true&select=*&order=id`, { headers: SB });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/products_custom?select=*&order=id`, { headers: SB });
       const d = await r.json();
       if (Array.isArray(d)) setCustomProducts(d);
     } catch(e) {}
@@ -152,9 +152,14 @@ export default function App() {
 
   // Products merge
   const allProducts = (() => {
-    const overridden = new Set(customProducts.filter(p => p.base_product_id != null).map(p => p.base_product_id));
-    const base = BASE_PRODUCTS.filter(p => !overridden.has(p.id));
-    const custom = customProducts.map(p => ({
+    // Products hidden (actif=false with base_product_id) -> filter from base list
+    const hidden = new Set(customProducts.filter(p => !p.actif && p.base_product_id != null).map(p => p.base_product_id));
+    // Active custom products that override base products
+    const overridden = new Set(customProducts.filter(p => p.actif && p.base_product_id != null).map(p => p.base_product_id));
+    // Base products minus hidden and overridden
+    const base = BASE_PRODUCTS.filter(p => !overridden.has(p.id) && !hidden.has(p.id));
+    // Only active custom products shown
+    const custom = customProducts.filter(p => p.actif).map(p => ({
       id: `c_${p.id}`, nom: p.nom, categorie: p.categorie||"Autres",
       prix: parseFloat(p.prix)||0, vrac: p.vrac||false,
       barcode: p.barcode||"", photo_url: p.photo_url||"",
