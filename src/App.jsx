@@ -1282,28 +1282,30 @@ export default function App() {
               ref={el=>{
                 if(!el||window._scannerInit) return;
                 window._scannerInit=true;
-                const s=document.createElement("script");
-                s.src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-                s.onload=()=>{
+                const startProdScan = () => {
                   const sc=new window.Html5Qrcode("barcode-reader");
                   window._html5QrCode=sc;
-                  sc.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:120}},
-                    (code)=>{if(window._scanned) return; window._scanned=true; if(window._html5QrCode){window._html5QrCode.stop().then(()=>{window._html5QrCode=null;window._scannerInit=false;window._scanned=false;setShowBarcodeScanner(false);}).catch(()=>{});} setEditProduct(p=>({...p,barcode:code}));},
+                  sc.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:100}},
+                    (code)=>{
+                      if(window._scanned) return;
+                      window._scanned=true;
+                      sc.stop().then(()=>{
+                        window._html5QrCode=null;
+                        window._scannerInit=false;
+                        window._scanned=false;
+                        setShowBarcodeScanner(false);
+                        setEditProduct(p=>({...p,barcode:code}));
+                      }).catch(()=>{});
+                    },
                     ()=>{})
                   .catch(e=>{alert("❌ Caméra: "+e);stopBarcodeScanner();});
                 };
-                if (window.Html5Qrcode) {
-                  startCartScan();
-                } else {
-                  const s = document.getElementById('html5qrcode-script');
-                  if (s) { s.onload = startCartScan; }
-                  else {
-                    const sc2=document.createElement('script');
-                    sc2.id='html5qrcode-script';
-                    sc2.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-                    sc2.onload=startCartScan;
-                    document.head.appendChild(sc2);
-                  }
+                if(window.Html5Qrcode){ startProdScan(); }
+                else {
+                  const s=document.createElement("script");
+                  s.src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
+                  s.onload=startProdScan;
+                  document.head.appendChild(s);
                 }
               }}/>
             <button style={S.btnCancel} onClick={stopBarcodeScanner}>✕ Annuler</button>
@@ -1324,26 +1326,20 @@ export default function App() {
                 const startCartScan = () => {
                   const sc=new window.Html5Qrcode('cart-barcode-reader');
                   window._cartScanner=sc;
-                  sc.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:120}},
+                  sc.start({facingMode:'environment'},{fps:15,qrbox:{width:280,height:100}},
                     (code)=>{
                       if(window._cartScanned) return;
                       window._cartScanned=true;
-                      // Chercher le produit
-                      const codeClean = String(code).trim().replace(/^0+/, '') || '0';
-                      const found = allProducts.find(p=>p.barcode&&(
-                        String(p.barcode).trim()===codeClean ||
-                        String(p.barcode).trim()===String(code).trim() ||
-                        String(p.barcode).trim().replace(/^0+/,'')===codeClean
-                      ));
-                      if(sc){sc.stop().then(()=>{window._cartScanner=null;window._cartScannerInit=false;window._cartScanned=false;}).catch(()=>{});}
-                      setShowCartScanner(false);
-                      if(found){
-                        addToCart(found);
-                        // Ajouter sans alert pour être rapide
-                        addToCart(found);
-                      } else {
-                        alert('❌ Code: '+codeClean+'\n\nProduit non enregistré.\nVa dans ⚙️ → Produits → modifier le produit → scan barcode pour l\'associer.');
-                      }
+                      const codeStr = String(code).trim();
+                      const found = allProducts.find(p=>p.barcode&&String(p.barcode).trim()===codeStr);
+                      sc.stop().then(()=>{
+                        window._cartScanner=null;
+                        window._cartScannerInit=false;
+                        window._cartScanned=false;
+                        setShowCartScanner(false);
+                        if(found){ addToCart(found); }
+                        else { alert('❌ Code '+codeStr+' non trouvé\nAssociez ce code dans ⚙️ → Produits'); }
+                      }).catch(()=>{});
                     },
                     ()=>{}
                   ).catch(e=>{alert('❌ Caméra: '+e);setShowCartScanner(false);});
@@ -1484,8 +1480,8 @@ const S = {
   barcodeInput:{display:'none'},
   btnW:{padding:'8px 14px',borderRadius:10,border:'none',background:'rgba(255,255,255,0.95)',color:'#D3518B',fontWeight:800,fontSize:14,cursor:'pointer'},
   btnD:{padding:'8px 14px',borderRadius:10,border:'2px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.15)',color:'#fff',fontWeight:700,fontSize:14,cursor:'pointer'},
-  main:{display:'flex',flex:1,overflow:'hidden'},
-  left:{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'},
+  main:{display:'flex',flex:1,overflow:'hidden',minHeight:0},
+  left:{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minHeight:0},
   catBar:{display:'flex',gap:6,padding:'8px 12px',overflowX:'auto',flexShrink:0,background:'rgba(0,0,0,0.1)',borderBottom:'1px solid rgba(255,255,255,0.15)',scrollbarWidth:'none'},
   catBtn:{padding:'6px 14px',borderRadius:20,border:'none',background:'rgba(255,255,255,0.2)',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer',whiteSpace:'nowrap'},
   catActive:{background:'linear-gradient(135deg,#D3518B,#a03568)',color:'#fff',boxShadow:'0 3px 12px rgba(211,81,139,0.4)'},
@@ -1495,7 +1491,7 @@ const S = {
   cardImg:{width:54,height:54,objectFit:'cover',borderRadius:10,marginBottom:2},
   cardName:{fontSize:11,fontWeight:700,color:'#fff',lineHeight:1.2,maxHeight:28,overflow:'hidden',textShadow:'0 1px 3px rgba(0,0,0,0.4)'},
   cardPrice:{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,0.4)'},
-  right:{width:300,minWidth:280,background:'rgba(0,0,0,0.2)',borderLeft:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',overflow:'hidden'},
+  right:{width:300,minWidth:280,background:'rgba(0,0,0,0.2)',borderLeft:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',overflow:'hidden',height:'100%'},
   cartHead:{padding:'12px 14px',fontWeight:900,fontSize:15,background:'rgba(0,0,0,0.15)',borderBottom:'1px solid rgba(255,255,255,0.15)',flexShrink:0,color:'#fff'},
   loyCard:{background:'rgba(211,81,139,0.2)',border:'1px solid rgba(211,81,139,0.4)',borderRadius:10,padding:'8px 12px',marginTop:8},
   btnX:{background:'transparent',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:16,fontWeight:700},
@@ -1503,7 +1499,7 @@ const S = {
   cogOn:{background:'linear-gradient(135deg,#D3518B,#78B7A0)',color:'#fff',border:'none'},
   cogOff:{background:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)'},
   emailBtn:{width:'100%',marginTop:6,padding:'5px',borderRadius:8,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'rgba(255,255,255,0.8)',fontWeight:700,fontSize:11,cursor:'pointer'},
-  items:{flex:1,overflowY:'auto',padding:'8px 10px',display:'flex',flexDirection:'column',gap:6,minHeight:0},
+  items:{flex:'1 1 0',overflowY:'auto',padding:'8px 10px',display:'flex',flexDirection:'column',gap:6,minHeight:0},
   empty:{color:'rgba(255,255,255,0.4)',textAlign:'center',padding:30,fontSize:14},
   item:{background:'rgba(255,255,255,0.2)',borderRadius:10,padding:'8px 10px',display:'flex',flexDirection:'column',gap:4,border:'1px solid rgba(255,255,255,0.3)'},
   iName:{fontSize:12,fontWeight:700,color:'#fff'},
@@ -1511,17 +1507,17 @@ const S = {
   qBtn:{width:26,height:26,borderRadius:8,border:'none',background:'rgba(255,255,255,0.3)',color:'#fff',fontWeight:900,cursor:'pointer',fontSize:16},
   qNum:{fontSize:14,fontWeight:800,minWidth:20,textAlign:'center',color:'#fff'},
   xBtn:{width:22,height:22,borderRadius:6,border:'none',background:'rgba(255,50,50,0.3)',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:11},
-  footer:{padding:'8px 10px',borderTop:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',gap:5,flexShrink:0,background:'rgba(0,0,0,0.15)'},
+  footer:{padding:'6px 8px',borderTop:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',gap:4,flexShrink:0,background:'rgba(0,0,0,0.15)'},
   discRow:{display:'flex',justifyContent:'space-between',fontSize:12,color:'#fff',fontWeight:700,padding:'2px 0'},
   totalRow:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0'},
-  totalAmt:{fontSize:22,fontWeight:900,color:'#fff',letterSpacing:'-1px',textShadow:'0 2px 8px rgba(0,0,0,0.3)'},
-  tvaRow:{display:'flex',justifyContent:'space-between',fontSize:10,color:'rgba(255,255,255,0.6)'},
-  payBtn:{flex:1,padding:'10px 5px',borderRadius:10,border:'none',fontWeight:900,fontSize:13,cursor:'pointer'},
+  totalAmt:{fontSize:20,fontWeight:900,color:'#fff',letterSpacing:'-1px',textShadow:'0 2px 8px rgba(0,0,0,0.3)'},
+  tvaRow:{display:'flex',justifyContent:'space-between',fontSize:9,color:'rgba(255,255,255,0.6)'},
+  payBtn:{flex:1,padding:'9px 4px',borderRadius:10,border:'none',fontWeight:900,fontSize:13,cursor:'pointer'},
   payCard:{background:'linear-gradient(135deg,#D3518B,#a03568)',color:'#fff',boxShadow:'0 4px 15px rgba(211,81,139,0.4)'},
   payCash:{background:'linear-gradient(135deg,#2e7d32,#1b5e20)',color:'#fff',boxShadow:'0 4px 15px rgba(46,125,50,0.4)'},
-  remiseBtn:{flex:1,padding:'8px',borderRadius:8,border:'1px solid rgba(255,165,0,0.4)',background:'rgba(255,165,0,0.15)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
+  remiseBtn:{flex:1,padding:'6px',borderRadius:8,border:'1px solid rgba(255,165,0,0.4)',background:'rgba(255,165,0,0.15)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
   clearRemise:{padding:'8px 10px',borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'rgba(255,50,50,0.15)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
-  clearBtn:{padding:8,borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'rgba(255,50,50,0.1)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
+  clearBtn:{padding:'5px 8px',borderRadius:8,border:'1px solid rgba(255,50,50,0.3)',background:'rgba(255,50,50,0.1)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
   settingsOverlay:{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',backdropFilter:'blur(6px)'},
   settingsPanel:{width:'95%',maxWidth:780,background:'#fff',display:'flex',flexDirection:'column',height:'92vh',borderRadius:16,overflow:'hidden',border:'1px solid #ddd',boxShadow:'0 20px 60px rgba(0,0,0,0.4)'},
   settingsHead:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 18px',background:'linear-gradient(135deg,#D3518B,#a03568,#3d7a63,#78B7A0)',flexShrink:0},
