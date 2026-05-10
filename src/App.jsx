@@ -1463,6 +1463,13 @@ export default function App() {
         ::-webkit-scrollbar-track{background:transparent}
         ::-webkit-scrollbar-thumb{background:rgba(211,81,139,0.3);border-radius:4px}
         @media print{body *{visibility:hidden}#receipt,#receipt *{visibility:visible}#receipt{position:fixed;left:0;top:0;background:white;color:black;padding:20px}}
+        @media (max-height: 700px){
+          .cart-footer{padding:6px 8px !important;gap:4px !important;}
+          .cart-footer button{padding:7px 4px !important;font-size:12px !important;}
+        }
+        @media (max-width: 768px){
+          .right-panel{width:260px !important;min-width:240px !important;}
+        }
       `}</style>
     </div>
   );
@@ -1488,7 +1495,7 @@ const S = {
   cardImg:{width:54,height:54,objectFit:'cover',borderRadius:10,marginBottom:2},
   cardName:{fontSize:11,fontWeight:700,color:'#fff',lineHeight:1.2,maxHeight:28,overflow:'hidden',textShadow:'0 1px 3px rgba(0,0,0,0.4)'},
   cardPrice:{fontSize:13,fontWeight:900,color:'#fff',textShadow:'0 1px 4px rgba(0,0,0,0.4)'},
-  right:{width:300,background:'rgba(0,0,0,0.2)',borderLeft:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column'},
+  right:{width:300,minWidth:280,background:'rgba(0,0,0,0.2)',borderLeft:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',overflow:'hidden'},
   cartHead:{padding:'12px 14px',fontWeight:900,fontSize:15,background:'rgba(0,0,0,0.15)',borderBottom:'1px solid rgba(255,255,255,0.15)',flexShrink:0,color:'#fff'},
   loyCard:{background:'rgba(211,81,139,0.2)',border:'1px solid rgba(211,81,139,0.4)',borderRadius:10,padding:'8px 12px',marginTop:8},
   btnX:{background:'transparent',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:16,fontWeight:700},
@@ -1496,7 +1503,7 @@ const S = {
   cogOn:{background:'linear-gradient(135deg,#D3518B,#78B7A0)',color:'#fff',border:'none'},
   cogOff:{background:'rgba(255,255,255,0.1)',color:'rgba(255,255,255,0.6)'},
   emailBtn:{width:'100%',marginTop:6,padding:'5px',borderRadius:8,border:'1px solid rgba(255,255,255,0.2)',background:'transparent',color:'rgba(255,255,255,0.8)',fontWeight:700,fontSize:11,cursor:'pointer'},
-  items:{flex:1,overflowY:'auto',padding:'8px 10px',display:'flex',flexDirection:'column',gap:6},
+  items:{flex:1,overflowY:'auto',padding:'8px 10px',display:'flex',flexDirection:'column',gap:6,minHeight:0},
   empty:{color:'rgba(255,255,255,0.4)',textAlign:'center',padding:30,fontSize:14},
   item:{background:'rgba(255,255,255,0.2)',borderRadius:10,padding:'8px 10px',display:'flex',flexDirection:'column',gap:4,border:'1px solid rgba(255,255,255,0.3)'},
   iName:{fontSize:12,fontWeight:700,color:'#fff'},
@@ -1504,12 +1511,12 @@ const S = {
   qBtn:{width:26,height:26,borderRadius:8,border:'none',background:'rgba(255,255,255,0.3)',color:'#fff',fontWeight:900,cursor:'pointer',fontSize:16},
   qNum:{fontSize:14,fontWeight:800,minWidth:20,textAlign:'center',color:'#fff'},
   xBtn:{width:22,height:22,borderRadius:6,border:'none',background:'rgba(255,50,50,0.3)',color:'#fff',fontWeight:700,cursor:'pointer',fontSize:11},
-  footer:{padding:12,borderTop:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',gap:7,flexShrink:0,background:'rgba(0,0,0,0.15)'},
+  footer:{padding:'8px 10px',borderTop:'1px solid rgba(255,255,255,0.2)',display:'flex',flexDirection:'column',gap:5,flexShrink:0,background:'rgba(0,0,0,0.15)'},
   discRow:{display:'flex',justifyContent:'space-between',fontSize:12,color:'#fff',fontWeight:700,padding:'2px 0'},
   totalRow:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'4px 0'},
-  totalAmt:{fontSize:26,fontWeight:900,color:'#fff',letterSpacing:'-1px',textShadow:'0 2px 8px rgba(0,0,0,0.3)'},
+  totalAmt:{fontSize:22,fontWeight:900,color:'#fff',letterSpacing:'-1px',textShadow:'0 2px 8px rgba(0,0,0,0.3)'},
   tvaRow:{display:'flex',justifyContent:'space-between',fontSize:10,color:'rgba(255,255,255,0.6)'},
-  payBtn:{flex:1,padding:'13px 5px',borderRadius:12,border:'none',fontWeight:900,fontSize:14,cursor:'pointer'},
+  payBtn:{flex:1,padding:'10px 5px',borderRadius:10,border:'none',fontWeight:900,fontSize:13,cursor:'pointer'},
   payCard:{background:'linear-gradient(135deg,#D3518B,#a03568)',color:'#fff',boxShadow:'0 4px 15px rgba(211,81,139,0.4)'},
   payCash:{background:'linear-gradient(135deg,#2e7d32,#1b5e20)',color:'#fff',boxShadow:'0 4px 15px rgba(46,125,50,0.4)'},
   remiseBtn:{flex:1,padding:'8px',borderRadius:8,border:'1px solid rgba(255,165,0,0.4)',background:'rgba(255,165,0,0.15)',color:'#fff',fontWeight:700,fontSize:12,cursor:'pointer'},
