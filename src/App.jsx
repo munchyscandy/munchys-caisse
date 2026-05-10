@@ -521,15 +521,129 @@ export default function App() {
         statut: Math.abs(ecart)>0.01 ? "ecart_justifie" : "ferme"
       })
     });
+    // Envoyer email recap
+    await envoyerRecapFermeture(especes, carte, ouverture, mf, ecart, noteEcart);
     setSession(null); setShowCloseSession(false); setMontantFermeture(""); setNoteEcart("");
     if (Math.abs(ecart) > 0.01) {
-      alert("Caisse fermee avec ecart justifie\nEcart: " + (ecart>0?"+":"") + ecart.toFixed(2) + "EUR\nNote: " + noteEcart);
+      alert("Caisse fermee avec ecart justifie\nEcart: " + (ecart>0?"+":"") + ecart.toFixed(2) + "EUR\nNote: " + noteEcart + "\n\nRecap envoye par email !");
     } else {
-      alert("Caisse fermee - comptes JUSTES !\nEspeces: " + especes.toFixed(2) + "EUR | Carte: " + carte.toFixed(2) + "EUR");
+      alert("Caisse fermee - comptes JUSTES !\nEspeces: " + especes.toFixed(2) + "EUR | Carte: " + carte.toFixed(2) + "EUR\nRecap envoye par email !");
     }
-  };;
+  };
 
   // Annuler une vente
+  // Email recap fermeture caisse
+  const envoyerRecapFermeture = async (especes, carte, ouverture, mf, ecart, note) => {
+    const date = new Date().toLocaleDateString('fr-BE', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
+        <h2 style="color:#D3518B">🍬 Munchy's Candy — Fermeture de caisse</h2>
+        <p style="color:#666">${date}</p>
+        <hr>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <tr style="background:#f5f5f5"><th style="padding:10px;text-align:left">Détail</th><th style="padding:10px;text-align:right">Montant</th></tr>
+          <tr><td style="padding:10px;border-bottom:1px solid #eee">💶 Fond d'ouverture</td><td style="padding:10px;border-bottom:1px solid #eee;text-align:right"><b>${ouverture.toFixed(2)}€</b></td></tr>
+          <tr><td style="padding:10px;border-bottom:1px solid #eee">💵 Ventes espèces</td><td style="padding:10px;border-bottom:1px solid #eee;text-align:right;color:#78B7A0"><b>+${especes.toFixed(2)}€</b></td></tr>
+          <tr><td style="padding:10px;border-bottom:1px solid #eee">💳 Ventes carte</td><td style="padding:10px;border-bottom:1px solid #eee;text-align:right;color:#D3518B"><b>+${carte.toFixed(2)}€</b></td></tr>
+          <tr style="background:#f5f5f5"><td style="padding:10px"><b>Total ventes</b></td><td style="padding:10px;text-align:right"><b>${(especes+carte).toFixed(2)}€</b></td></tr>
+          <tr><td style="padding:10px;border-bottom:1px solid #eee">Montant attendu caisse</td><td style="padding:10px;border-bottom:1px solid #eee;text-align:right">${(ouverture+especes).toFixed(2)}€</td></tr>
+          <tr><td style="padding:10px;border-bottom:1px solid #eee">Montant compté caisse</td><td style="padding:10px;border-bottom:1px solid #eee;text-align:right">${mf.toFixed(2)}€</td></tr>
+          <tr style="background:${Math.abs(ecart)>0.01?'#fff3e0':'#e8f5e9'}">
+            <td style="padding:10px"><b>Écart</b></td>
+            <td style="padding:10px;text-align:right;color:${Math.abs(ecart)>0.01?'#ff9800':'#4caf50'}"><b>${ecart>0?'+':''}${ecart.toFixed(2)}€</b></td>
+          </tr>
+        </table>
+        ${note ? `<p style="background:#fff3e0;padding:12px;border-radius:8px;border-left:4px solid #ff9800"><b>📝 Note:</b> ${note}</p>` : ''}
+        <hr>
+        <p style="color:#888;font-size:12px">Munchy's Candy · Mouscron · TVA BE 0750.497.413</p>
+      </div>`;
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method:"POST",
+        headers:{"Authorization":"Bearer re_PGnLJC4M_7XzWAhEPeJq7i9nQaBqEMBJn","Content-Type":"application/json"},
+        body: JSON.stringify({
+          from:"contact@munchyscandy.fr",
+          to:["contact.kalice@gmail.com"],
+          subject:`🍬 Fermeture caisse Munchy's — ${date}`,
+          html
+        })
+      });
+    } catch(e) {}
+  };
+
+  // Export relevé mensuel
+  const exportMensuel = async (mois) => {
+    const [annee, m] = mois.split('-');
+    const debut = `${mois}-01T00:00:00`;
+    const fin = `${mois}-31T23:59:59`;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${debut}&date_heure=lte.${fin}&order=date_heure&select=*`, { headers: SB });
+    const data = await r.json();
+    if (!Array.isArray(data)) { alert("Erreur chargement"); return; }
+    const ventesOk = data.filter(v=>!v.annulee);
+    const especes = ventesOk.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const carte = ventesOk.filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const tva = (especes+carte) * 0.06 / 1.06;
+    // Grouper par jour
+    const parJour = {};
+    ventesOk.forEach(v=>{
+      const j = v.date_heure.split('T')[0];
+      if(!parJour[j]) parJour[j]={especes:0,carte:0,nb:0};
+      if(v.paiement==='espèces') parJour[j].especes+=parseFloat(v.total||0);
+      else parJour[j].carte+=parseFloat(v.total||0);
+      parJour[j].nb++;
+    });
+    const w = window.open('','_blank');
+    w.document.write(`
+      <html><head><title>Relevé ${mois}</title>
+      <style>
+        body{font-family:sans-serif;padding:30px;max-width:800px;margin:auto;color:#333}
+        h1{color:#D3518B}h2{color:#555;font-size:16px}
+        table{width:100%;border-collapse:collapse;margin:16px 0}
+        th{background:#D3518B;color:#fff;padding:10px;text-align:left}
+        td{padding:8px 10px;border-bottom:1px solid #eee}
+        tr:hover{background:#f9f9f9}
+        .total{background:#78B7A0;color:#fff;font-weight:bold}
+        .right{text-align:right}
+        .recap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+        .box{background:#f5f5f5;padding:16px;border-radius:8px;text-align:center}
+        .box b{display:block;font-size:24px;color:#D3518B}
+        .box small{color:#888;font-size:12px}
+      </style></head>
+      <body>
+        <h1>🍬 Munchy's Candy — Relevé mensuel</h1>
+        <p><b>Période :</b> ${new Date(annee, m-1, 1).toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</p>
+        <p><b>TVA BE 0750.497.413</b> · Mouscron, Belgique</p>
+        <hr>
+        <div class="recap">
+          <div class="box"><b>${(especes+carte).toFixed(2)}€</b><small>Chiffre d'affaires TTC</small></div>
+          <div class="box"><b>${tva.toFixed(2)}€</b><small>dont TVA 6%</small></div>
+          <div class="box"><b>${ventesOk.length}</b><small>Transactions</small></div>
+        </div>
+        <div class="recap">
+          <div class="box"><b style="color:#78B7A0">${especes.toFixed(2)}€</b><small>💵 Espèces</small></div>
+          <div class="box"><b>${carte.toFixed(2)}€</b><small>💳 Carte</small></div>
+          <div class="box"><b>${data.filter(v=>v.annulee).length}</b><small>⛔ Annulées</small></div>
+        </div>
+        <h2>Détail par jour</h2>
+        <table>
+          <tr><th>Date</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
+          ${Object.entries(parJour).map(([j,[d]])=>`
+            <tr>
+              <td>${new Date(j).toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',month:'short'})}</td>
+              <td>${parJour[j].nb}</td>
+              <td class="right">${parJour[j].especes.toFixed(2)}€</td>
+              <td class="right">${parJour[j].carte.toFixed(2)}€</td>
+              <td class="right"><b>${(parJour[j].especes+parJour[j].carte).toFixed(2)}€</b></td>
+            </tr>
+          `).join('')}
+          <tr class="total"><td colspan="2"><b>TOTAL</b></td><td class="right">${especes.toFixed(2)}€</td><td class="right">${carte.toFixed(2)}€</td><td class="right">${(especes+carte).toFixed(2)}€</td></tr>
+        </table>
+        <p style="color:#888;font-size:11px;margin-top:30px">Généré le ${new Date().toLocaleString('fr-BE')} · Export comptable Munchy's Candy</p>
+        <script>window.print();</script>
+      </body></html>
+    `);
+  };
+
   const annulerVente = async (id, motif) => {
     if (!motif.trim()) { alert("Motif obligatoire"); return; }
     await fetch(`${SUPABASE_URL}/rest/v1/ventes?id=eq.${id}`, {
@@ -770,6 +884,10 @@ export default function App() {
                   <input type="date" style={{...S.eInput,width:'auto',padding:'7px 12px'}}
                     value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
                   {testMode && <span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 8px',borderRadius:6}}>🧪 MODE TEST</span>}
+                  <button style={{...S.editBtn,background:'rgba(120,183,160,0.15)',color:'#78B7A0',fontSize:12,padding:'5px 10px',marginLeft:'auto'}}
+                    onClick={()=>exportMensuel(journalDate.slice(0,7))}>
+                    📥 Export mensuel {journalDate.slice(0,7)}
+                  </button>
                   <span style={{fontSize:13,color:'#888'}}>💳 <b style={{color:'#D3518B'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:13,color:'#888'}}>💵 <b style={{color:'#78B7A0'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:13,color:'#888'}}>Total: <b style={{color:'#fff'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
