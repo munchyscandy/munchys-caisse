@@ -743,7 +743,24 @@ export default function App() {
         <div style={{flex:1}}>
           <input style={S.searchInput} placeholder="Rechercher un produit..."
             value={search} onChange={e=>setSearch(e.target.value)}
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"/>
+            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+            onKeyDown={async e=>{
+              if(e.key==='Enter' && search.trim()){
+                // Si que des chiffres → chercher comme code-barres
+                if(/^\d+$/.test(search.trim())){
+                  const code = search.trim();
+                  const found = allProducts.find(p=>p.barcode&&String(p.barcode).trim()===code);
+                  if(found){ addToCart(found); setSearch(''); }
+                  else {
+                    const nom = await lookupBarcode(code);
+                    if(nom){
+                      const ok = window.confirm('Produit trouvé :\n"'+nom+'"\n\nAjouter au catalogue ?');
+                      if(ok){ setEditProduct({nom,categorie:'Autres',prix:'',vrac:false,barcode:code,photo_url:''}); setIsNew(true); setShowSettings(true); setSettingsTab('produits'); setSearch(''); }
+                    } else { alert('Code '+code+' non trouvé sur Open Food Facts'); }
+                  }
+                }
+              }
+            }}/>
         </div>
         <div style={S.hRight}>
           <button style={{...S.btnD,fontSize:20,padding:'8px 14px'}} onClick={()=>{
