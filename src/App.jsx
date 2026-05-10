@@ -49,6 +49,9 @@ export default function App() {
   const [sendingEmail, setSendingEmail] = useState(false);
   // Mode test
   const [testMode, setTestMode] = useState(false);
+  // Cash calculator
+  const [montantDonne, setMontantDonne] = useState('');
+  const [testVentes, setTestVentes] = useState([]);
   // PIN & Session
   const [pinInput, setPinInput] = useState('');
   const [pinUnlocked, setPinUnlocked] = useState(false);
@@ -279,7 +282,7 @@ export default function App() {
         body: JSON.stringify({cagnotte: Math.max(0,newCag)})
       });
     }
-    // Enregistrer la vente (sauf en mode test)
+    // Enregistrer la vente
     if (!testMode) {
       await fetch(`${SUPABASE_URL}/rest/v1/ventes`, {
         method:'POST', headers:{...SB,Prefer:"return=minimal"},
@@ -291,6 +294,16 @@ export default function App() {
           client_id: client ? client.id : null
         })
       });
+    } else {
+      // Mode test : stockage local uniquement
+      const fakeVente = {
+        id: Date.now(), date_heure: new Date().toISOString(),
+        articles: JSON.stringify(cart), total: finalTotal,
+        paiement: method, remise: discountAmt, cagnotte_used: cagnotteUsed,
+        client_nom: client ? client.name : null, annulee: false,
+        note_annulation: null, _test: true
+      };
+      setTestVentes(prev => [fakeVente, ...prev]);
     }
     setReceipt({cart:[...cart], cartTotal, cagnotteUsed, discountAmt, finalTotal, tva, cashback, method, client, date:new Date()});
     setModal('receipt');
@@ -645,7 +658,7 @@ Carte: ${carte.toFixed(2)}€
             {client && <div style={S.tvaRow}><span>Cashback +5%</span><span style={{color:'#e91e8c'}}>+{fmt(cashback)}</span></div>}
             <div style={{display:'flex',gap:6}}>
               <button style={{...S.payBtn,...S.payCard}} onClick={()=>cart.length>0&&setModal('payment')} disabled={!cart.length}>💳 CARTE</button>
-              <button style={{...S.payBtn,...S.payCash}} onClick={()=>cart.length>0&&handlePayment('espèces')} disabled={!cart.length}>💵 ESPÈCES</button>
+              <button style={{...S.payBtn,...S.payCash}} onClick={()=>cart.length>0&&setModal('cash')} disabled={!cart.length}>💵 ESPÈCES</button>
             </div>
             <div style={{display:'flex',gap:6}}>
               <button style={S.remiseBtn} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
@@ -742,14 +755,15 @@ Carte: ${carte.toFixed(2)}€
                 <div style={{padding:'10px 16px 6px',display:'flex',gap:12,alignItems:'center',flexShrink:0,flexWrap:'wrap'}}>
                   <input type="date" style={{...S.eInput,width:'auto',padding:'7px 12px'}}
                     value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
-                  <span style={{fontSize:13,color:'#888'}}>💳 <b style={{color:'#e91e8c'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-                  <span style={{fontSize:13,color:'#888'}}>💵 <b style={{color:'#4caf50'}}>{ventes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-                  <span style={{fontSize:13,color:'#888'}}>Total: <b style={{color:'#fff'}}>{ventes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-                  <span style={{fontSize:12,color:'#555',marginLeft:'auto'}}>{ventes.filter(v=>!v.annulee).length} vente(s)</span>
+                  {testMode && <span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 8px',borderRadius:6}}>🧪 MODE TEST</span>}
+                  <span style={{fontSize:13,color:'#888'}}>💳 <b style={{color:'#D3518B'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:13,color:'#888'}}>💵 <b style={{color:'#78B7A0'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:13,color:'#888'}}>Total: <b style={{color:'#fff'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:12,color:'#555',marginLeft:'auto'}}>{(testMode?testVentes:ventes).filter(v=>!v.annulee).length} vente(s)</span>
                 </div>
                 <div style={S.settingsList}>
-                  {!ventes.length && <div style={{color:'#888',textAlign:'center',padding:30}}>Aucune vente ce jour</div>}
-                  {ventes.map(v=>{
+                  {!( testMode ? testVentes : ventes).length && <div style={{color:'#888',textAlign:'center',padding:30}}>{testMode?'Aucune vente test — faites une vente en mode 🧪':'Aucune vente ce jour'}</div>}
+                  {(testMode ? testVentes : ventes).map(v=>{
                     const arts = typeof v.articles==='string' ? JSON.parse(v.articles) : v.articles;
                     return (
                       <div key={v.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:5,opacity:v.annulee?0.4:1}}>
@@ -1060,6 +1074,53 @@ Carte: ${carte.toFixed(2)}€
             <div style={S.mBtns}>
               <button style={S.btnCancel} onClick={()=>{setModal(null);setVracG('');}}>Annuler</button>
               <button style={S.btnConfirm} onClick={handleVrac}>Ajouter ✓</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CASH MODAL */}
+      {modal==='cash' && (
+        <div style={S.overlay}>
+          <div style={S.modal}>
+            <h2 style={S.mTitle}>💵 Paiement espèces</h2>
+            <div style={{fontSize:42,fontWeight:900,textAlign:'center',color:'#fff',marginBottom:6,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
+            <p style={{color:'#666',fontSize:12,textAlign:'center',marginBottom:18}}>Montant à encaisser</p>
+            
+            <label style={{fontSize:13,color:'#6a8a78',fontWeight:700,display:'block',marginBottom:8}}>💶 Montant donné par le client (optionnel)</label>
+            <input style={{...S.eInput,fontSize:26,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
+              type="number" step="0.01" min="0" placeholder="0,00"
+              value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
+            
+            {montantDonne && parseFloat(montantDonne.replace(',','.')) >= finalTotal && (
+              <div style={{background:'linear-gradient(135deg,rgba(120,183,160,0.15),rgba(120,183,160,0.08))',border:'1px solid rgba(120,183,160,0.3)',borderRadius:14,padding:'14px 20px',marginBottom:16,textAlign:'center'}}>
+                <div style={{fontSize:13,color:'#6a8a78',marginBottom:4}}>Monnaie à rendre</div>
+                <div style={{fontSize:38,fontWeight:900,color:'#78B7A0',letterSpacing:'-1px'}}>
+                  {fmt(parseFloat(montantDonne.replace(',','.'))-finalTotal)}
+                </div>
+              </div>
+            )}
+            {montantDonne && parseFloat(montantDonne.replace(',','.')) < finalTotal && (
+              <div style={{background:'rgba(255,50,50,0.1)',border:'1px solid rgba(255,50,50,0.2)',borderRadius:12,padding:12,marginBottom:16,textAlign:'center',color:'#ff6b6b',fontSize:13,fontWeight:700}}>
+                ⚠️ Montant insuffisant — manque {fmt(finalTotal-parseFloat(montantDonne.replace(',','.')))}
+              </div>
+            )}
+            
+            {/* Raccourcis montants */}
+            <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+              {[5,10,20,50].map(m=>(
+                <button key={m} style={{flex:1,padding:'8px 4px',borderRadius:10,border:'1px solid rgba(120,183,160,0.2)',background:'rgba(120,183,160,0.08)',color:'#78B7A0',fontWeight:700,fontSize:13,cursor:'pointer',minWidth:50}}
+                  onClick={()=>setMontantDonne(String(m))}>{m}€</button>
+              ))}
+            </div>
+
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
+              <button style={{...S.btnConfirm, opacity: montantDonne && parseFloat(montantDonne.replace(',','.')) < finalTotal ? 0.5 : 1}}
+                disabled={montantDonne && parseFloat(montantDonne.replace(',','.')) < finalTotal}
+                onClick={()=>{handlePayment('espèces');setMontantDonne('');}}>
+                ✅ Valider
+              </button>
             </div>
           </div>
         </div>
