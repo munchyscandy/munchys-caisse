@@ -520,11 +520,11 @@ export default function App() {
           html
         })
       });
-      if(!r.ok){
-        const err=await r.text();
-        alert("❌ Email non envoyé: "+err);
+      const result = await r.json();
+      if(result.id) {
+        alert("✅ Email envoyé ! ID: "+result.id);
       } else {
-        alert("✅ Email de fermeture envoyé à contact.kalice@gmail.com !");
+        alert("❌ Resend erreur: "+JSON.stringify(result));
       }
     }catch(e){
       alert("❌ Erreur: "+e.message);
