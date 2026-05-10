@@ -77,6 +77,7 @@ export default function App() {
   const [showCartScanner, setShowCartScanner] = useState(false);
   const [scanMode, setScanMode] = useState('product'); // 'product' or 'cart'
   const allProductsRef = useRef([]);
+  const scanModeRef = useRef('product');
 
 
   const [boxes, setBoxes] = useState([]);
@@ -228,6 +229,7 @@ export default function App() {
   })();
 
   allProductsRef.current = allProducts;
+  scanModeRef.current = scanMode;
 
   const filtered = allProducts.filter(p=>{
     const cat = activeCat==="TOUT"||p.categorie===activeCat;
@@ -697,6 +699,21 @@ export default function App() {
         alert("❌ Erreur "+r.status+": "+err);
       }
     }catch(e){alert("❌ Erreur réseau: "+e.message);}
+  };
+
+  // Recherche Open Food Facts si produit non trouvé localement
+  const lookupBarcode = async (code) => {
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const data = await r.json();
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+        const nom = p.product_name_fr || p.product_name || p.generic_name_fr || p.generic_name || '';
+        const marque = p.brands || '';
+        return nom ? `${nom}${marque ? ' — '+marque : ''}` : null;
+      }
+    } catch(e) {}
+    return null;
   };
 
   const sendEmail = async () => {
@@ -1302,21 +1319,35 @@ export default function App() {
                     (code)=>{
                       if(window._scanned) return;
                       window._scanned=true;
-                      sc.stop().then(()=>{
+                      sc.stop().then(async ()=>{
                         window._html5QrCode=null;
                         window._scannerInit=false;
                         window._scanned=false;
                         setShowBarcodeScanner(false);
-                        setScanMode(prev=>{
-                          if(prev==='cart'){
-                            const found=allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
-                            if(found){addToCart(found);}
-                            else{alert('Code '+code+' non trouvé - associez-le dans Produits');}
+                        const currentMode = scanModeRef.current;
+                        setScanMode('product');
+                        if(currentMode==='cart'){
+                          const found=allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
+                          if(found){
+                            addToCart(found);
                           } else {
-                            setEditProduct(p=>({...p,barcode:code}));
+                            // Chercher sur Open Food Facts
+                            const nom = await lookupBarcode(code);
+                            if(nom){
+                              const confirmer = window.confirm(`Produit trouvé :\n"${nom}"\n\nVoulez-vous l'ajouter au catalogue ?`);
+                              if(confirmer){
+                                setEditProduct({nom,categorie:'Autres',prix:'',vrac:false,barcode:code,photo_url:''});
+                                setIsNew(true);
+                                setShowSettings(true);
+                                setSettingsTab('produits');
+                              }
+                            } else {
+                              alert('Code '+code+' non trouvé.\nAssociez-le dans ⚙️ → Produits');
+                            }
                           }
-                          return 'product';
-                        });
+                        } else {
+                          setEditProduct(p=>({...p,barcode:code}));
+                        }
                       }).catch(()=>{});
                     },
                     ()=>{})
