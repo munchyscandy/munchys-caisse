@@ -1147,13 +1147,12 @@ export default function App() {
           <p style={{color:'#888',fontSize:13,textAlign:'center',marginBottom:16}}>1,50€ / 100g</p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:14}}>
             {['1','2','3','4','5','6','7','8','9','0','00','⌫'].map(k=>(
-              <button key={k} style={{padding:14,borderRadius:10,border:'none',background:'rgba(255,255,255,0.08)',color:'#fff',fontSize:18,fontWeight:800,cursor:'pointer'}}
+              <button key={k} style={{padding:14,borderRadius:10,border:'1px solid #ddd',background:'#f0f0f0',color:'#111',fontSize:20,fontWeight:800,cursor:'pointer'}}
                 onClick={()=>k==='⌫'?setVracG(v=>v.slice(0,-1)):setVracG(v=>v+k)}>{k}</button>
             ))}
           </div>
-          <div style={{display:'flex',justifyContent:'space-between',background:`rgba(211,81,139,0.1)`,borderRadius:10,padding:'12px 16px',marginBottom:16}}>
-            <span style={{fontSize:24,fontWeight:900}}>{vracG||'0'} g</span>
-            <span style={{fontSize:20,fontWeight:900,color:C1}}>= {((parseFloat(vracG)||0)/100*VRAC_PRICE_PER_100G).toFixed(2)}€</span>
+          <div style={{display:'flex',justifyContent:'space-between',background:'#f8f8f8',border:'1px solid #eee',borderRadius:10,padding:'12px 16px',marginBottom:16}}>
+            <span style={{fontSize:24,fontWeight:900,color:'#111'}}>{vracG||'0'} g</span>
           </div>
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>{setModal(null);setVracG('');}}>Annuler</button>
@@ -1166,9 +1165,9 @@ export default function App() {
       {modal==='cash'&&(
         <div style={S.overlay}><div style={S.modal}>
           <h2 style={S.mTitle}>💵 Paiement espèces</h2>
-          <div style={{fontSize:42,fontWeight:900,textAlign:'center',color:'#fff',marginBottom:6,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
-          <p style={{color:'#666',fontSize:12,textAlign:'center',marginBottom:16}}>Montant à encaisser</p>
-          <label style={{fontSize:13,color:'#6a8a78',fontWeight:700,display:'block',marginBottom:8}}>💶 Montant donné (optionnel)</label>
+          <div style={{fontSize:42,fontWeight:900,textAlign:'center',color:'#111',marginBottom:6,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
+          <p style={{color:'#555',fontSize:12,textAlign:'center',marginBottom:16}}>Montant à encaisser</p>
+          <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💶 Montant donné (optionnel)</label>
           <input style={{...S.eInput,fontSize:26,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
             type="number" step="0.01" min="0" placeholder="0,00" value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
           {montantDonne&&parseFloat(montantDonne)>=finalTotal&&(
