@@ -56,6 +56,8 @@ export default function App() {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const videoRef = { current: null };
   // Box Mystère
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
@@ -245,6 +247,17 @@ export default function App() {
     setDiscountInput(''); setModal(null); setReceipt(null); setSearch('');
   };
 
+  // Barcode scanner via camera
+  const startBarcodeScanner = () => setShowBarcodeScanner(true);
+  const stopBarcodeScanner = () => {
+    setShowBarcodeScanner(false);
+    if (window._barcodeStream) {
+      window._barcodeStream.getTracks().forEach(t => t.stop());
+      window._barcodeStream = null;
+    }
+    clearInterval(window._barcodeInterval);
+  };
+
   const uploadPhoto = async (file) => {
     setUploading(true);
     try {
@@ -305,7 +318,7 @@ export default function App() {
   };
 
   const hideBaseProduct = async (p) => {
-    if (!confirm(`Masquer "${p.nom}" du catalogue ?`)) return;
+    if (!confirm(`Supprimer "${p.nom}" du catalogue ?`)) return;
     await fetch(`${SUPABASE_URL}/rest/v1/products_custom`, {
       method:'POST', headers:{...SB,Prefer:"return=minimal"},
       body:JSON.stringify({nom:p.nom,categorie:p.categorie,prix:p.prix,vrac:p.vrac,barcode:p.barcode||null,photo_url:p.photo_url||null,actif:false,base_product_id:typeof p.id==='number'?p.id:null})
@@ -561,7 +574,7 @@ export default function App() {
                         <button style={S.editBtn} onClick={()=>openEdit(p)}>✏️</button>
                         {p.custom_id
                           ? <button style={S.delBtn} onClick={()=>deleteProduct(p.custom_id)}>🗑️</button>
-                          : <button style={S.delBtn} title="Masquer du catalogue" onClick={()=>hideBaseProduct(p)}>🙈</button>
+                          : <button style={S.delBtn} title="Supprimer du catalogue" onClick={()=>hideBaseProduct(p)}>🗑️</button>
                         }
                       </div>
                     </div>
@@ -753,7 +766,10 @@ export default function App() {
               <label style={S.eLabel}>Prix €</label>
               <input style={S.eInput} type="number" step="0.01" value={editProduct.prix} onChange={e=>setEditProduct(p=>({...p,prix:e.target.value}))}/>
               <label style={S.eLabel}>Barcode</label>
-              <input style={S.eInput} value={editProduct.barcode} onChange={e=>setEditProduct(p=>({...p,barcode:e.target.value}))}/>
+              <div style={{display:'flex',gap:8}}>
+                <input style={{...S.eInput,flex:1}} value={editProduct.barcode} onChange={e=>setEditProduct(p=>({...p,barcode:e.target.value}))} placeholder="Ex: 5011061181329"/>
+                <button style={{...S.uploadBtn,padding:'8px 12px',fontSize:16,flexShrink:0}} onClick={startBarcodeScanner} title="Scanner avec la caméra">📷</button>
+              </div>
               <label style={S.eLabel}>Photo</label>
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
                 <label style={{...S.uploadBtn,opacity:uploading?0.6:1}}>
@@ -926,6 +942,49 @@ export default function App() {
               <button style={S.btnCancel} onClick={()=>{setEmailClient(null);setEmailSubject('');setEmailBody('');}}>Annuler</button>
               <button style={S.btnConfirm} onClick={sendEmail} disabled={sendingEmail}>{sendingEmail?'Envoi...':'✉️ Envoyer'}</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* BARCODE SCANNER MODAL */}
+      {showBarcodeScanner && editProduct && (
+        <div style={{...S.overlay,zIndex:400}}>
+          <div style={{...S.modal,width:400,textAlign:'center'}}>
+            <h2 style={S.mTitle}>📷 Scanner le code-barres</h2>
+            <p style={{color:'#888',fontSize:13,marginBottom:14}}>Pointez la caméra vers le code-barres</p>
+            <div style={{position:'relative',borderRadius:14,overflow:'hidden',background:'#000',marginBottom:14}}>
+              <video id="barcode-video" autoPlay playsInline muted style={{width:'100%',maxHeight:260,display:'block'}}
+                ref={el => {
+                  if (el && !window._barcodeStream) {
+                    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+                      .then(stream => {
+                        window._barcodeStream = stream;
+                        el.srcObject = stream;
+                        if ('BarcodeDetector' in window) {
+                          const detector = new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','upc_a','upc_e','qr_code']});
+                          window._barcodeInterval = setInterval(async () => {
+                            try {
+                              const codes = await detector.detect(el);
+                              if (codes.length > 0) {
+                                const val = codes[0].rawValue;
+                                setEditProduct(p => ({...p, barcode: val}));
+                                stopBarcodeScanner();
+                                alert('✅ Code-barres détecté : ' + val);
+                              }
+                            } catch(e) {}
+                          }, 300);
+                        } else {
+                          alert("BarcodeDetector non supporté sur ce navigateur. Essayez Chrome/Edge.");
+                          stopBarcodeScanner();
+                        }
+                      })
+                      .catch(e => { alert("Caméra inaccessible: "+e.message); stopBarcodeScanner(); });
+                  }
+                }}
+              />
+              <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:200,height:120,border:'2px solid #e91e8c',borderRadius:8,boxShadow:'0 0 0 1000px rgba(0,0,0,0.3)'}}/>
+            </div>
+            <button style={S.btnCancel} onClick={stopBarcodeScanner}>✕ Annuler</button>
           </div>
         </div>
       )}
