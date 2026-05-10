@@ -76,6 +76,42 @@ export default function App() {
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showCartScanner, setShowCartScanner] = useState(false);
   const allProductsRef = React.useRef([]);
+
+  // Démarrer le scanner caisse via useEffect (après rendu DOM)
+  React.useEffect(()=>{
+    if(!showCartScanner) return;
+    let sc = null;
+    const timer = setTimeout(()=>{
+      const startScan = () => {
+        sc = new window.Html5Qrcode('cart-barcode-reader');
+        window._cartScanner = sc;
+        sc.start(
+          {facingMode:'environment'},
+          {fps:15, qrbox:{width:280,height:100}},
+          (code)=>{
+            const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===String(code).trim());
+            if(sc){sc.stop().catch(()=>{});}
+            setShowCartScanner(false);
+            if(found){ addToCart(found); }
+            else { alert('❌ Code '+code+' non trouvé\nAssociez-le dans ⚙️ → Produits'); }
+          },
+          ()=>{}
+        ).catch(e=>{ alert('❌ Caméra: '+e); setShowCartScanner(false); });
+      };
+      if(window.Html5Qrcode){ startScan(); }
+      else {
+        const s=document.createElement('script');
+        s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        s.onload=startScan;
+        document.head.appendChild(s);
+      }
+    }, 300);
+    return ()=>{
+      clearTimeout(timer);
+      if(sc){try{sc.stop().catch(()=>{});}catch(e){}}
+      window._cartScanner=null;
+    };
+  }, [showCartScanner]);
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
@@ -1319,39 +1355,14 @@ export default function App() {
       {/* CART SCANNER - scan pour ajouter au panier */}
       {showCartScanner&&(
         <div style={{...S.overlay,zIndex:350}}>
-          <div style={{...S.modal,width:420,textAlign:'center'}} className="settings-dark">
-            <h2 style={{...S.mTitle,color:'#111'}}>📷 Scanner un produit</h2>
-            <p style={{color:'#555',fontSize:13,marginBottom:14}}>Pointez vers le code-barres du produit</p>
+          <div style={{...S.modal,width:420,textAlign:'center',background:'#1a1a2e'}}>
+            <h2 style={{...S.mTitle,color:'#fff'}}>📷 Scanner un produit</h2>
+            <p style={{color:'#aaa',fontSize:13,marginBottom:14}}>Pointez vers le code-barres</p>
             <div id="cart-barcode-reader" style={{width:'100%',marginBottom:14,borderRadius:12,overflow:'hidden',background:'#000',minHeight:220}}
-              ref={el=>{
-                if(!el||window._cartScannerInit) return;
-                window._cartScannerInit=true;
-                const startCartScan = () => {
-                  const sc=new window.Html5Qrcode('cart-barcode-reader');
-                  window._cartScanner=sc;
-                  sc.start({facingMode:'environment'},{fps:15,qrbox:{width:280,height:100}},
-                    (code)=>{
-                      if(window._cartScanned) return;
-                      window._cartScanned=true;
-                      const codeStr = String(code).trim();
-                      const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===codeStr);
-                      sc.stop().then(()=>{
-                        window._cartScanner=null;
-                        window._cartScannerInit=false;
-                        window._cartScanned=false;
-                        setShowCartScanner(false);
-                        if(found){ addToCart(found); }
-                        else { alert('❌ Code '+codeStr+' non trouvé\nAssociez ce code dans ⚙️ → Produits'); }
-                      }).catch(()=>{});
-                    },
-                    ()=>{}
-                  ).catch(e=>{alert('❌ Caméra: '+e);setShowCartScanner(false);});
-                };
+              ref={()=>{
                 document.head.appendChild(s);
               }}/>
-            <button style={{...S.btnCancel,background:'#eee',color:'#333',border:'1px solid #ccc'}} onClick={()=>{
-              try{if(window._cartScanner){window._cartScanner.stop().catch(()=>{});window._cartScanner=null;}}catch(e){}
-              window._cartScannerInit=false;window._cartScanned=false;
+            <button style={{...S.btnCancel,background:'rgba(255,255,255,0.2)',color:'#fff',border:'1px solid rgba(255,255,255,0.3)'}} onClick={()=>{
               setShowCartScanner(false);
             }}>✕ Annuler</button>
           </div>
@@ -1545,4 +1556,3 @@ const S = {
   eInput:{padding:'9px 12px',borderRadius:8,border:'1px solid #ddd',background:'#fafafa',color:'#111',fontSize:14,outline:'none',width:'100%'},
   uploadBtn:{display:'inline-block',padding:'9px 14px',borderRadius:8,border:'none',background:'linear-gradient(135deg,#D3518B,#78B7A0)',color:'#fff',fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center'},
 };
-  
