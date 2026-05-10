@@ -524,7 +524,7 @@ export default function App() {
         const err=await r.text();
         alert("❌ Email non envoyé: "+err);
       } else {
-        alert("✅ Email envoyé à fullrenov59@gmail.com !");
+        alert("✅ Email de fermeture envoyé à contact.kalice@gmail.com !");
       }
     }catch(e){
       alert("❌ Erreur: "+e.message);
