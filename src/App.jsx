@@ -74,6 +74,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showCartScanner, setShowCartScanner] = useState(false);
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
@@ -1280,6 +1281,50 @@ export default function App() {
                 document.head.appendChild(s);
               }}/>
             <button style={S.btnCancel} onClick={stopBarcodeScanner}>✕ Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {/* CART SCANNER - scan pour ajouter au panier */}
+      {showCartScanner&&(
+        <div style={{...S.overlay,zIndex:350}}>
+          <div style={{...S.modal,width:420,textAlign:'center'}} className="settings-dark">
+            <h2 style={{...S.mTitle,color:'#111'}}>📷 Scanner un produit</h2>
+            <p style={{color:'#555',fontSize:13,marginBottom:14}}>Pointez vers le code-barres du produit</p>
+            <div id="cart-barcode-reader" style={{width:'100%',marginBottom:14,borderRadius:12,overflow:'hidden',background:'#000',minHeight:220}}
+              ref={el=>{
+                if(!el||window._cartScannerInit) return;
+                window._cartScannerInit=true;
+                const s=document.createElement('script');
+                s.src='https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+                s.onload=()=>{
+                  const sc=new window.Html5Qrcode('cart-barcode-reader');
+                  window._cartScanner=sc;
+                  sc.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:120}},
+                    (code)=>{
+                      if(window._cartScanned) return;
+                      window._cartScanned=true;
+                      // Chercher le produit
+                      const found = allProducts.find(p=>p.barcode===code||p.barcode===String(code));
+                      if(sc){sc.stop().then(()=>{window._cartScanner=null;window._cartScannerInit=false;window._cartScanned=false;}).catch(()=>{});}
+                      setShowCartScanner(false);
+                      if(found){
+                        addToCart(found);
+                        alert('✅ '+found.nom+' ajouté au panier !');
+                      } else {
+                        alert('❌ Produit non trouvé pour le code: '+code);
+                      }
+                    },
+                    ()=>{}
+                  ).catch(e=>{alert('❌ Caméra: '+e);setShowCartScanner(false);});
+                };
+                document.head.appendChild(s);
+              }}/>
+            <button style={{...S.btnCancel,background:'#eee',color:'#333',border:'1px solid #ccc'}} onClick={()=>{
+              if(window._cartScanner){window._cartScanner.stop().catch(()=>{});window._cartScanner=null;}
+              window._cartScannerInit=false;window._cartScanned=false;
+              setShowCartScanner(false);
+            }}>✕ Annuler</button>
           </div>
         </div>
       )}
