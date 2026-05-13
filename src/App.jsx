@@ -79,6 +79,7 @@ export default function App() {
   const allProductsRef = useRef([]);
   const scanModeRef = useRef('product');
   const settingsTabRef = useRef('produits');
+  const showSettingsRef = useRef(false);
 
 
   const [boxes, setBoxes] = useState([]);
@@ -108,7 +109,7 @@ export default function App() {
         barcodeBuffer = '';
         clearTimeout(barcodeTimer);
         const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
-        if(found && settingsTabRef.current==='stock'){
+        if(found && showSettingsRef.current && settingsTabRef.current==='stock'){
           // Mode stock : ouvrir directement la fiche stock du produit
           setStockScanned(found);
           setEditingStock(found);
@@ -287,6 +288,7 @@ export default function App() {
   allProductsRef.current = allProducts;
   scanModeRef.current = scanMode;
   settingsTabRef.current = settingsTab;
+  showSettingsRef.current = showSettings;
 
   // Handle barcode product add from global listener
   useEffect(()=>{
