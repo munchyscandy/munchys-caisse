@@ -78,6 +78,7 @@ export default function App() {
   const [scanMode, setScanMode] = useState('product'); // 'product' or 'cart'
   const allProductsRef = useRef([]);
   const scanInputRef = useRef(null);
+  const searchRef = useRef(null);
   const scanBufferRef = useRef('');
   const scanTimerRef = useRef(null);
   const scanModeRef = useRef('product');
@@ -98,7 +99,7 @@ export default function App() {
 
   useEffect(() => {
     loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession();
-    setTimeout(()=>scanInputRef.current?.focus(), 500);
+    setTimeout(()=>searchRef.current?.focus(), 500);
 
     // Écouteur global douchette scanner
     let barcodeBuffer = '';
@@ -322,7 +323,7 @@ export default function App() {
   // Refocus scanner input when not in modal/settings
   const refocusScanner = () => {
     if(!showSettings && !modal && scanInputRef.current) {
-      scanInputRef.current.focus();
+      searchRef.current?.focus();
     }
   };
 
@@ -837,6 +838,7 @@ export default function App() {
         <div style={S.logo}>🍬 MUNCHY'S</div>
         <div style={{flex:1}}>
           <input style={S.searchInput} placeholder="Rechercher un produit..."
+            ref={searchRef}
             value={search} onChange={e=>setSearch(e.target.value)}
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
             onKeyDown={async e=>{
@@ -1623,60 +1625,7 @@ export default function App() {
         </div></div>
       )}
 
-      {/* Input caché pour capter la douchette sur iPad */}
-      <input
-        ref={scanInputRef}
-        style={{position:'fixed',left:'-9999px',top:'50%',width:'10px',height:'10px',fontSize:'16px',opacity:0.01,border:'none',outline:'none',background:'transparent',color:'transparent'}}
-        defaultValue=''
-        autoComplete='off' autoCorrect='off' autoCapitalize='off' spellCheck='false'
-        onKeyDown={async e=>{
-          if(!showSettings && !modal){
-            const isEnter = e.key==='Enter'||e.keyCode===13;
-            const code = scanBufferRef.current.trim();
-            if(isEnter && code.length>=6){
-              scanBufferRef.current='';
-              clearTimeout(scanTimerRef.current);
-              const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
-              if(found){ addToCart(found); }
-              else {
-                try {
-                  const r = await fetch('https://world.openfoodfacts.org/api/v0/product/'+code+'.json');
-                  const d = await r.json();
-                  if(d.status===1&&d.product){
-                    const p=d.product;
-                    const nom=p.product_name_fr||p.product_name||'';
-                    if(nom&&window.confirm('Trouve: '+nom+'. Ajouter au catalogue ?')){
-                      window._pendingBarcode={nom,barcode:code};
-                      document.dispatchEvent(new CustomEvent('addProductFromBarcode'));
-                    }
-                  } else { alert('Code '+code+' non reconnu. Associez-le dans Produits.'); }
-                } catch(err){}
-              }
-            } else if(e.key!=='Enter'&&/^[0-9a-zA-Z]$/.test(e.key)){
-              scanBufferRef.current+=e.key;
-              clearTimeout(scanTimerRef.current);
-              scanTimerRef.current=setTimeout(()=>{scanBufferRef.current='';},200);
-            }
-          } else if(showSettings&&settingsTabRef.current==='stock'){
-            const isEnter=e.key==='Enter'||e.keyCode===13;
-            const code=scanBufferRef.current.trim();
-            if(isEnter&&code.length>=6){
-              scanBufferRef.current='';
-              clearTimeout(scanTimerRef.current);
-              const found=allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
-              if(found){
-                setStockScanned(found);setEditingStock(found);setStockQty('0');setStockAlert('5');
-                document.dispatchEvent(new CustomEvent('scrollToStock',{detail:found.id}));
-              } else { alert('Code '+code+' non trouvé.'); }
-            } else if(e.key!=='Enter'&&/^[0-9a-zA-Z]$/.test(e.key)){
-              scanBufferRef.current+=e.key;
-              clearTimeout(scanTimerRef.current);
-              scanTimerRef.current=setTimeout(()=>{scanBufferRef.current='';},200);
-            }
-          }
-        }}
-        onBlur={()=>{ setTimeout(()=>{ if(!showSettings&&!modal) scanInputRef.current?.focus(); },150); }}
-      />
+      {/* Douchette: géré via searchRef ci-dessus */}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
