@@ -79,6 +79,8 @@ export default function App() {
   const allProductsRef = useRef([]);
   const scanInputRef = useRef(null);
   const searchRef = useRef(null);
+  const scannerRef = useRef(null);
+  const [scannerValue, setScannerValue] = useState('');
   const scanBufferRef = useRef('');
   const scanTimerRef = useRef(null);
   const scanModeRef = useRef('product');
