@@ -714,6 +714,53 @@ export default function App() {
     }
   };
 
+  const exportCSV = async (dateFrom, dateTo) => {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${dateFrom}T00:00:00&date_heure=lte.${dateTo}T23:59:59&order=date_heure&select=*`, { headers: SB });
+    const data = await r.json();
+    if (!Array.isArray(data)) { alert("Erreur chargement"); return; }
+    const ok = data.filter(v => !v.annulee);
+    
+    // En-têtes CSV
+    const headers = ['Date','Heure','N° vente','Mode paiement','Total TTC','TVA 6%','HT','Remise','Cagnotte utilisée','Client','Articles'];
+    const rows = ok.map(v => {
+      const d = new Date(v.date_heure);
+      const arts = typeof v.articles==='string' ? JSON.parse(v.articles) : v.articles;
+      const tva = parseFloat(v.total||0) * 0.06 / 1.06;
+      const ht = parseFloat(v.total||0) - tva;
+      return [
+        d.toLocaleDateString('fr-BE'),
+        d.toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'}),
+        v.id,
+        v.paiement,
+        parseFloat(v.total||0).toFixed(2).replace('.',','),
+        tva.toFixed(2).replace('.',','),
+        ht.toFixed(2).replace('.',','),
+        parseFloat(v.remise||0).toFixed(2).replace('.',','),
+        parseFloat(v.cagnotte_used||0).toFixed(2).replace('.',','),
+        v.client_nom||'',
+        '"'+(arts||[]).map(a=>a.nom+' x'+a.qty).join(' | ')+'"'
+      ].join(';');
+    });
+    
+    // Ligne totaux
+    const totalTTC = ok.reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const totalTVA = totalTTC * 0.06 / 1.06;
+    const totalEsp = ok.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const totalCarte = ok.filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    
+    rows.push('');
+    rows.push(`TOTAL;;${ok.length} ventes;Espèces: ${totalEsp.toFixed(2).replace('.',',')}€ / Carte: ${totalCarte.toFixed(2).replace('.',',')}€;${totalTTC.toFixed(2).replace('.',',')};${totalTVA.toFixed(2).replace('.',',')};;;;;`);
+    
+    const csv = '\uFEFF' + headers.join(';') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `munchys-ventes-${dateFrom}-au-${dateTo}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportPeriode = async (dateFrom, dateTo) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${dateFrom}T00:00:00&date_heure=lte.${dateTo}T23:59:59&order=date_heure&select=*`, { headers: SB });
     const data = await r.json();
