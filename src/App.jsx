@@ -1626,9 +1626,9 @@ export default function App() {
       {/* Input caché pour capter la douchette sur iPad */}
       <input
         ref={scanInputRef}
-        style={{position:'fixed',opacity:0,width:1,height:1,top:0,left:0,zIndex:-1,fontSize:16}}
-        value=""
-        readOnly
+        style={{position:'fixed',left:'-9999px',top:'50%',width:'10px',height:'10px',fontSize:'16px',opacity:0.01,border:'none',outline:'none',background:'transparent',color:'transparent'}}
+        defaultValue=''
+        autoComplete='off' autoCorrect='off' autoCapitalize='off' spellCheck='false'
         onKeyDown={async e=>{
           if(!showSettings && !modal){
             const isEnter = e.key==='Enter'||e.keyCode===13;
@@ -1675,7 +1675,7 @@ export default function App() {
             }
           }
         }}
-        onBlur={()=>{ if(scanInputRef.current && !showSettings && !modal) setTimeout(()=>scanInputRef.current?.focus(),100); }}
+        onBlur={()=>{ setTimeout(()=>{ if(!showSettings&&!modal) scanInputRef.current?.focus(); },150); }}
       />
 
       <style>{`
