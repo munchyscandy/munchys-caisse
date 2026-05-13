@@ -78,6 +78,7 @@ export default function App() {
   const [scanMode, setScanMode] = useState('product'); // 'product' or 'cart'
   const allProductsRef = useRef([]);
   const scanModeRef = useRef('product');
+  const settingsTabRef = useRef('produits');
 
 
   const [boxes, setBoxes] = useState([]);
@@ -87,6 +88,7 @@ export default function App() {
   const [stockData, setStockData] = useState([]);
   const [editingStock, setEditingStock] = useState(null);
   const [stockSearch, setStockSearch] = useState('');
+  const [stockScanned, setStockScanned] = useState(null); // produit trouvé par scan
   const [stockQty, setStockQty] = useState('');
   const [stockAlert, setStockAlert] = useState('5');
 
@@ -106,6 +108,15 @@ export default function App() {
         barcodeBuffer = '';
         clearTimeout(barcodeTimer);
         const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
+        if(found && settingsTabRef.current==='stock'){
+          // Mode stock : ouvrir directement la fiche stock du produit
+          setStockScanned(found);
+          setEditingStock(found);
+          setStockQty('0');
+          setStockAlert('5');
+          document.dispatchEvent(new CustomEvent('scrollToStock', {detail:found.id}));
+          return;
+        }
         if(found){
           addToCart(found);
         } else {
@@ -121,6 +132,9 @@ export default function App() {
                 window._pendingBarcode = {nom:nom+(marque?' — '+marque:''),barcode:code};
                 document.dispatchEvent(new CustomEvent('addProductFromBarcode'));
               }
+            } else if(settingsTabRef.current==='stock') {
+              // Mode stock - juste signaler produit inconnu
+              alert('Code '+code+' non trouvé. Associez-le dans Produits d\'abord.');
             } else {
               alert('Code '+code+' non reconnu. Associez-le dans Produits.');
             }
@@ -272,6 +286,7 @@ export default function App() {
 
   allProductsRef.current = allProducts;
   scanModeRef.current = scanMode;
+  settingsTabRef.current = settingsTab;
 
   // Handle barcode product add from global listener
   useEffect(()=>{
@@ -287,6 +302,15 @@ export default function App() {
     };
     document.addEventListener('addProductFromBarcode', handler);
     return () => document.removeEventListener('addProductFromBarcode', handler);
+  }, []);
+
+  useEffect(()=>{
+    const handler = (e) => {
+      const el = document.getElementById('stock-item-'+e.detail);
+      if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+    };
+    document.addEventListener('scrollToStock', handler);
+    return () => document.removeEventListener('scrollToStock', handler);
   }, []);
 
   const filtered = allProducts.filter(p=>{
@@ -1057,8 +1081,15 @@ export default function App() {
 
             {settingsTab==='stock'&&(
               <>
-                <input style={S.settingsSearch} placeholder="Rechercher..." value={stockSearch} onChange={e=>setStockSearch(e.target.value)} autoComplete="off"/>
-                <div style={{padding:'4px 16px 8px',fontSize:12,color:'#888'}}>{allProducts.length} produits · Cliquer pour modifier · 🟢 OK · 🟡 Bas · 🔴 Vide · ⬜ Non saisi</div>
+                <div style={{display:'flex',gap:8,margin:'10px 14px 6px',alignItems:'center'}}>
+                  <input style={{...S.settingsSearch,margin:0,flex:1}} placeholder="🔍 Rechercher ou scanner..." 
+                    value={stockSearch} onChange={e=>setStockSearch(e.target.value)} autoComplete="off"
+                    id="stock-search-input"/>
+                </div>
+                <div style={{padding:'4px 16px 8px',fontSize:12,color:'#555'}}>
+                  {allProducts.length} produits · <b>Scanne ou clique</b> un produit pour modifier le stock · 🟢 OK · 🟡 Bas · 🔴 Vide · ⬜ Non saisi
+                  {stockScanned&&<span style={{marginLeft:8,color:'#D3518B',fontWeight:700}}>→ {stockScanned.nom}</span>}
+                </div>
                 <div style={S.settingsList}>
                   {allProducts.filter(p=>!stockSearch||p.nom.toLowerCase().includes(stockSearch.toLowerCase())).slice(0,300).map(p=>{
                     const s=stockData.find(sd=>sd.product_nom===p.nom);
@@ -1067,10 +1098,10 @@ export default function App() {
                     const dot=qty===null?'⬜':qty<=0?'🔴':qty<=seuil?'🟡':'🟢';
                     const color=qty===null?'#555':qty<=0?'#ff5555':qty<=seuil?'#ffa500':'#4caf50';
                     return(
-                      <div key={p.id} style={{...S.sItem,cursor:'pointer'}} onClick={()=>{setEditingStock(p);setStockQty(qty!==null?String(qty):'0');setStockAlert(String(seuil));}}>
+                      <div key={p.id} id={`stock-item-${p.id}`} style={{...S.sItem,cursor:'pointer',border:stockScanned?.id===p.id?'2px solid #D3518B':'1px solid #e9ecef',background:stockScanned?.id===p.id?'#fff0f6':'#f8f9fa'}} onClick={()=>{setEditingStock(p);setStockQty(qty!==null?String(qty):'0');setStockAlert(String(seuil));setStockScanned(null);}}>
                         <div style={{fontSize:20,width:30,textAlign:'center',flexShrink:0}}>{dot}</div>
                         <div style={{flex:1,overflow:'hidden'}}>
-                          <div style={{fontSize:13,fontWeight:700,color:'#ddd',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
+                          <div style={{fontSize:13,fontWeight:700,color:'#111',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.nom}</div>
                           <div style={{fontSize:11,color:'#777'}}>{p.categorie}</div>
                         </div>
                         <div style={{textAlign:'right',flexShrink:0,marginRight:8}}>
