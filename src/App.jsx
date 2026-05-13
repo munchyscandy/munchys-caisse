@@ -42,6 +42,8 @@ export default function App() {
   const [discountType, setDiscountType] = useState('percent');
   const [discountInput, setDiscountInput] = useState('');
   const [receipt, setReceipt] = useState(null);
+  const [receiptEmail, setReceiptEmail] = useState('');
+  const [sendingReceiptEmail, setSendingReceiptEmail] = useState(false);
   const [vracG, setVracG] = useState('');
   const [emailClient, setEmailClient] = useState(null);
   const [emailSubject, setEmailSubject] = useState('');
@@ -51,6 +53,10 @@ export default function App() {
   const [montantDonne, setMontantDonne] = useState('');
   const [testVentes, setTestVentes] = useState([]);
   const [exportDateFrom, setExportDateFrom] = useState(new Date().toISOString().split('T')[0].slice(0,7)+'-01');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportPeriodType, setExportPeriodType] = useState('custom'); // daily, monthly, quarterly, custom
+  const [exportDetailLevel, setExportDetailLevel] = useState('global'); // global, detail, client
+  const [exportFormat, setExportFormat] = useState('pdf'); // pdf, csv, both
   const [exportDateTo, setExportDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [pinInput, setPinInput] = useState('');
   const [pinUnlocked, setPinUnlocked] = useState(false);
@@ -714,6 +720,146 @@ export default function App() {
     }
   };
 
+  const getExportDates = () => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth();
+    if(exportPeriodType==='daily'){
+      const d = today.toISOString().split('T')[0];
+      return {from:d, to:d, label:'Journalier - '+today.toLocaleDateString('fr-BE')};
+    } else if(exportPeriodType==='monthly'){
+      const from = new Date(y,m,1).toISOString().split('T')[0];
+      const to = new Date(y,m+1,0).toISOString().split('T')[0];
+      return {from,to,label:'Mensuel - '+today.toLocaleDateString('fr-BE',{month:'long',year:'numeric'})};
+    } else if(exportPeriodType==='quarterly'){
+      const q = Math.floor(m/3);
+      const from = new Date(y,q*3,1).toISOString().split('T')[0];
+      const to = new Date(y,q*3+3,0).toISOString().split('T')[0];
+      return {from,to,label:`T${q+1} ${y}`};
+    } else {
+      return {from:exportDateFrom, to:exportDateTo, label:`Du ${exportDateFrom} au ${exportDateTo}`};
+    }
+  };
+
+  const runExport = async () => {
+    const {from, to, label} = getExportDates();
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${from}T00:00:00&date_heure=lte.${to}T23:59:59&order=date_heure&select=*`, { headers: SB });
+    const data = await r.json();
+    if (!Array.isArray(data)) { alert("Erreur chargement"); return; }
+    const ok = data.filter(v => !v.annulee);
+    if(!ok.length){ alert('Aucune vente sur cette période'); return; }
+    if(exportFormat==='pdf'||exportFormat==='both') await generateExportPDF(ok, label, from, to);
+    if(exportFormat==='csv'||exportFormat==='both') await exportCSV(from, to);
+    setShowExportModal(false);
+  };
+
+  const generateExportPDF = async (ok, label, from, to) => {
+    const totalTTC = ok.reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const totalTVA = totalTTC * 0.06 / 1.06;
+    const totalEsp = ok.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
+    const totalCarte = ok.filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
+
+    // Grouper par jour
+    const parJour = {};
+    ok.forEach(v=>{
+      const j = v.date_heure.split('T')[0];
+      if(!parJour[j]) parJour[j]={esp:0,carte:0,nb:0,ventes:[]};
+      if(v.paiement==='espèces') parJour[j].esp+=parseFloat(v.total||0);
+      else parJour[j].carte+=parseFloat(v.total||0);
+      parJour[j].nb++;
+      parJour[j].ventes.push(v);
+    });
+
+    // Grouper par client si besoin
+    const parClient = {};
+    if(exportDetailLevel==='client'){
+      ok.forEach(v=>{
+        const c = v.client_nom||'Anonyme';
+        if(!parClient[c]) parClient[c]={total:0,nb:0};
+        parClient[c].total+=parseFloat(v.total||0);
+        parClient[c].nb++;
+      });
+    }
+
+    const w = window.open('about:blank','_blank');
+    w.document.write(`<html><head><title>Export ${label}</title>
+    <style>
+      body{font-family:sans-serif;padding:30px;max-width:850px;margin:auto;color:#333}
+      h1{color:#D3518B}h2{color:#444;font-size:15px;margin-top:20px;border-bottom:2px solid #D3518B;padding-bottom:4px}
+      table{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+      th{background:#D3518B;color:#fff;padding:8px 10px;text-align:left}
+      td{padding:7px 10px;border-bottom:1px solid #eee}tr:hover{background:#fafafa}
+      .total-row{background:#78B7A0;color:#fff;font-weight:bold}
+      .right{text-align:right}
+      .recap{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+      .box{background:#f5f5f5;padding:12px;border-radius:8px;text-align:center}
+      .box b{display:block;font-size:20px;color:#D3518B}
+      .annulee{color:#ff5555;text-decoration:line-through;opacity:0.6}
+    </style></head><body>
+    <h1>🍬 Munchy's Candy — Export ${label}</h1>
+    <p style="color:#888;font-size:12px">TVA BE 0750.497.413 · Mouscron · Généré le ${new Date().toLocaleString('fr-BE')}</p>
+    <div class="recap">
+      <div class="box"><b>${ok.length}</b><small>Transactions</small></div>
+      <div class="box"><b>${totalTTC.toFixed(2)}€</b><small>CA TTC</small></div>
+      <div class="box"><b style="color:#78B7A0">${totalEsp.toFixed(2)}€</b><small>💵 Espèces</small></div>
+      <div class="box"><b>${totalCarte.toFixed(2)}€</b><small>💳 Carte</small></div>
+    </div>
+    <div class="recap">
+      <div class="box"><b>${totalTVA.toFixed(2)}€</b><small>TVA 6%</small></div>
+      <div class="box"><b>${(totalTTC-totalTVA).toFixed(2)}€</b><small>CA HT</small></div>
+    </div>
+
+    ${exportDetailLevel==='global' ? `
+    <h2>Récapitulatif par jour</h2>
+    <table>
+      <tr><th>Date</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
+      ${Object.entries(parJour).map(([j,d])=>`
+        <tr>
+          <td>${new Date(j+'T12:00:00').toLocaleDateString('fr-BE',{weekday:'short',day:'numeric',month:'short',year:'numeric'})}</td>
+          <td>${d.nb}</td><td class="right">${d.esp.toFixed(2)}€</td>
+          <td class="right">${d.carte.toFixed(2)}€</td>
+          <td class="right"><b>${(d.esp+d.carte).toFixed(2)}€</b></td>
+        </tr>`).join('')}
+      <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
+    </table>` : ''}
+
+    ${exportDetailLevel==='detail' ? `
+    <h2>Détail de toutes les ventes</h2>
+    <table>
+      <tr><th>Date/Heure</th><th>Articles</th><th>Client</th><th class="right">Remise</th><th class="right">Total</th><th>Paiement</th></tr>
+      ${ok.map(v=>{
+        const arts=typeof v.articles==='string'?JSON.parse(v.articles):v.articles;
+        return `<tr>
+          <td>${new Date(v.date_heure).toLocaleString('fr-BE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td style="font-size:11px">${(arts||[]).map(a=>a.nom+' x'+a.qty).join(', ')}</td>
+          <td>${v.client_nom||'—'}</td>
+          <td class="right">${parseFloat(v.remise||0)>0?parseFloat(v.remise).toFixed(2)+'€':'—'}</td>
+          <td class="right"><b>${parseFloat(v.total).toFixed(2)}€</b></td>
+          <td>${v.paiement==='carte'?'💳':'💵'}</td>
+        </tr>`;
+      }).join('')}
+      <tr class="total-row"><td colspan="4">TOTAL — ${ok.length} ventes</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
+    </table>` : ''}
+
+    ${exportDetailLevel==='client' ? `
+    <h2>Récapitulatif par client</h2>
+    <table>
+      <tr><th>Client</th><th>Nb achats</th><th class="right">Total dépensé</th><th class="right">Moyenne/achat</th></tr>
+      ${Object.entries(parClient).sort((a,b)=>b[1].total-a[1].total).map(([c,d])=>`
+        <tr>
+          <td>${c}</td><td>${d.nb}</td>
+          <td class="right"><b>${d.total.toFixed(2)}€</b></td>
+          <td class="right">${(d.total/d.nb).toFixed(2)}€</td>
+        </tr>`).join('')}
+      <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
+    </table>` : ''}
+
+    <p style="color:#888;font-size:10px;margin-top:30px">Munchy's Candy · Société Kalice TVA BE 0750.497.413 · Export comptable ${label}</p>
+    <script>setTimeout(()=>window.print(),500);</script>
+    </body></html>`);
+    w.document.close();
+  };
+
   const exportCSV = async (dateFrom, dateTo) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${dateFrom}T00:00:00&date_heure=lte.${dateTo}T23:59:59&order=date_heure&select=*`, { headers: SB });
     const data = await r.json();
@@ -926,6 +1072,40 @@ export default function App() {
       }
     } catch(e) {}
     return null;
+  };
+
+  const sendReceiptByEmail = async (email, r) => {
+    if(!email||!email.includes('@')){ alert('Email invalide'); return; }
+    setSendingReceiptEmail(true);
+    const html = `<div style="font-family:monospace;max-width:400px;margin:auto;padding:20px;background:#f9f9f9;border-radius:12px">
+      <h2 style="color:#D3518B;text-align:center">🍬 MUNCHY'S CANDY</h2>
+      <p style="text-align:center;color:#888;font-size:12px">Mouscron · TVA BE 0750.497.413</p>
+      <p style="text-align:center;color:#888;font-size:12px">${new Date(r.date).toLocaleString('fr-BE')}</p>
+      <hr>
+      <table style="width:100%;font-size:13px">
+        ${r.cart.map(i=>`<tr><td>${i.nom} x${i.qty}</td><td style="text-align:right">${(i.prix*i.qty).toFixed(2)}€</td></tr>`).join('')}
+      </table>
+      <hr>
+      ${r.discountAmt>0?`<p style="color:#ff9800">💸 Remise: −${r.discountAmt.toFixed(2)}€</p>`:''}
+      ${r.cagnotteUsed>0?`<p style="color:#D3518B">🎁 Cagnotte: −${r.cagnotteUsed.toFixed(2)}€</p>`:''}
+      <p style="font-size:18px;font-weight:bold">TOTAL TTC: ${r.finalTotal.toFixed(2)}€</p>
+      <p style="color:#888;font-size:11px">dont TVA 6%: ${r.tva.toFixed(2)}€</p>
+      <p>Paiement: ${r.method==='carte'?'💳 Carte':'💵 Espèces'}</p>
+      ${r.client?`<hr><p style="color:#4caf50">💳 Cashback +${r.cashback.toFixed(2)}€ · Solde: ${(Math.max(0,(r.client.cagnotte||0)-r.cagnotteUsed+r.cashback)).toFixed(2)}€</p>`:''}
+      <hr>
+      <p style="text-align:center;color:#D3518B;font-weight:bold">Merci de votre visite ! 🍬</p>
+    </div>`;
+    try {
+      const resp = await fetch("https://swrpladhwaspibpoegwn.supabase.co/functions/v1/smooth-action",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer sb_publishable_1m5yOZvVzFfXQQYqoN8h_A_nd56vaPI"},
+        body:JSON.stringify({to:email,subject:"🍬 Votre ticket Munchy's Candy",html})
+      });
+      const d = await resp.json();
+      if(d.id){ alert('✅ Ticket envoyé à '+email+' !'); setReceiptEmail(''); }
+      else { alert('❌ Erreur: '+JSON.stringify(d)); }
+    } catch(e){ alert('❌ Erreur: '+e.message); }
+    setSendingReceiptEmail(false);
   };
 
   const sendEmail = async () => {
@@ -1545,6 +1725,21 @@ export default function App() {
               <div style={{color:'#444',margin:'6px 0'}}>{'─'.repeat(32)}</div>
               <div style={{textAlign:'center',color:C1,fontWeight:700}}>Merci de votre visite ! 🍬</div>
             </div>
+            <div style={{marginTop:12,marginBottom:10}}>
+              <div style={{fontSize:12,color:'#555',fontWeight:700,marginBottom:6}}>📧 Envoyer le ticket par email</div>
+              <div style={{display:'flex',gap:6}}>
+                <input style={{...S.eInput,flex:1,padding:'8px 12px',fontSize:13}}
+                  type="email" placeholder={receipt.client?.email||"email@client.com"}
+                  value={receiptEmail}
+                  onChange={e=>setReceiptEmail(e.target.value)}
+                  onFocus={()=>{ if(receipt.client?.email&&!receiptEmail) setReceiptEmail(receipt.client.email); }}/>
+                <button style={{...S.btnConfirm,flex:'none',padding:'8px 14px',fontSize:13}}
+                  onClick={()=>sendReceiptByEmail(receiptEmail||receipt.client?.email, receipt)}
+                  disabled={sendingReceiptEmail}>
+                  {sendingReceiptEmail?'⏳':'📧'}
+                </button>
+              </div>
+            </div>
             <div style={S.mBtns}>
               <button style={S.btnCancel} onClick={()=>window.print()}>🖨️ Imprimer</button>
               <button style={S.btnConfirm} onClick={newSale}>Nouvelle vente ✓</button>
@@ -1767,6 +1962,64 @@ export default function App() {
       )}
 
       {/* Douchette: géré via searchRef ci-dessus */}
+
+      {/* EXPORT MODAL */}
+      {showExportModal&&(
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:480}} className="settings-content">
+            <h2 style={{...S.mTitle,color:'#111'}}>📥 Exporter les ventes</h2>
+
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📅 Période</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                {[['daily','Journalier (auj.)'],['monthly','Mensuel (ce mois)'],['quarterly','Trimestriel'],['custom','Personnalise']].map(([v,l])=>(
+                  <label key={v} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,border:`2px solid ${exportPeriodType===v?'#D3518B':'#ddd'}`,cursor:'pointer',background:exportPeriodType===v?'#fff0f6':'#fafafa',fontSize:13}}>
+                    <input type="radio" name="period" value={v} checked={exportPeriodType===v} onChange={()=>setExportPeriodType(v)} style={{accentColor:'#D3518B'}}/>
+                    {l}
+                  </label>
+                ))}
+              </div>
+              {exportPeriodType==='custom'&&(
+                <div style={{display:'flex',gap:8,alignItems:'center',marginTop:10}}>
+                  <span style={{fontSize:12,color:'#555'}}>Du</span>
+                  <input type="date" style={{...S.eInput,flex:1,padding:'6px 10px'}} value={exportDateFrom} onChange={e=>setExportDateFrom(e.target.value)}/>
+                  <span style={{fontSize:12,color:'#555'}}>au</span>
+                  <input type="date" style={{...S.eInput,flex:1,padding:'6px 10px'}} value={exportDateTo} onChange={e=>setExportDateTo(e.target.value)}/>
+                </div>
+              )}
+            </div>
+
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📊 Niveau de détail</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {[['global','Vue globale — récap par jour (pour comptable)'],['detail','Vue détaillée — chaque vente (toutes les transactions)'],['client','Par client — dépenses par client fidélité']].map(([v,l])=>(
+                  <label key={v} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,border:`2px solid ${exportDetailLevel===v?'#D3518B':'#ddd'}`,cursor:'pointer',background:exportDetailLevel===v?'#fff0f6':'#fafafa',fontSize:13}}>
+                    <input type="radio" name="detail" value={v} checked={exportDetailLevel===v} onChange={()=>setExportDetailLevel(v)} style={{accentColor:'#D3518B'}}/>
+                    {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{marginBottom:20}}>
+              <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📄 Format</div>
+              <div style={{display:'flex',gap:8}}>
+                {[['pdf','📄 PDF'],['csv','📊 CSV'],['both','📄+📊 Les deux']].map(([v,l])=>(
+                  <label key={v} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:8,border:`2px solid ${exportFormat===v?'#D3518B':'#ddd'}`,cursor:'pointer',background:exportFormat===v?'#fff0f6':'#fafafa',fontSize:13,flex:1,justifyContent:'center'}}>
+                    <input type="radio" name="format" value={v} checked={exportFormat===v} onChange={()=>setExportFormat(v)} style={{accentColor:'#D3518B'}}/>
+                    {l}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={S.mBtns}>
+              <button style={S.btnCancel} onClick={()=>setShowExportModal(false)}>Annuler</button>
+              <button style={S.btnConfirm} onClick={runExport}>📥 Générer l'export</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
