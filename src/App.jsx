@@ -92,6 +92,48 @@ export default function App() {
 
   useEffect(() => {
     loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession();
+
+    // Écouteur global douchette scanner
+    let barcodeBuffer = '';
+    let barcodeTimer = null;
+    const handleGlobalKeydown = async (e) => {
+      // Ignorer si on est dans un input/textarea (sauf la recherche)
+      const tag = document.activeElement?.tagName;
+      if(tag==='INPUT'||tag==='TEXTAREA') return;
+      
+      if(e.key==='Enter' && barcodeBuffer.length >= 6){
+        const code = barcodeBuffer.trim();
+        barcodeBuffer = '';
+        clearTimeout(barcodeTimer);
+        const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
+        if(found){
+          addToCart(found);
+        } else {
+          try {
+            const r = await fetch('https://world.openfoodfacts.org/api/v0/product/'+code+'.json');
+            const d = await r.json();
+            if(d.status===1&&d.product){
+              const p = d.product;
+              const nom = p.product_name_fr||p.product_name||p.generic_name_fr||'';
+              const marque = p.brands||'';
+              if(nom && window.confirm('Trouvé: '+nom+(marque?' - '+marque:'')+'. Ajouter au catalogue ?')){
+                // setEditProduct handled in main component
+                window._pendingBarcode = {nom:nom+(marque?' — '+marque:''),barcode:code};
+                document.dispatchEvent(new CustomEvent('addProductFromBarcode'));
+              }
+            } else {
+              alert('Code '+code+' non reconnu. Associez-le dans Produits.');
+            }
+          } catch(err){}
+        }
+      } else if(e.key!=='Enter' && /^[0-9a-zA-Z]$/.test(e.key)){
+        barcodeBuffer += e.key;
+        clearTimeout(barcodeTimer);
+        barcodeTimer = setTimeout(()=>{ barcodeBuffer=''; }, 100);
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKeydown);
+    return () => document.removeEventListener('keydown', handleGlobalKeydown);
     // Précharger html5-qrcode
     if (!document.getElementById('html5qrcode-script')) {
       const s = document.createElement('script');
@@ -230,6 +272,22 @@ export default function App() {
 
   allProductsRef.current = allProducts;
   scanModeRef.current = scanMode;
+
+  // Handle barcode product add from global listener
+  useEffect(()=>{
+    const handler = () => {
+      if(window._pendingBarcode){
+        const {nom, barcode} = window._pendingBarcode;
+        window._pendingBarcode = null;
+        setEditProduct({nom,categorie:'Autres',prix:'',vrac:false,barcode,photo_url:''});
+        setIsNew(true);
+        setShowSettings(true);
+        setSettingsTab('produits');
+      }
+    };
+    document.addEventListener('addProductFromBarcode', handler);
+    return () => document.removeEventListener('addProductFromBarcode', handler);
+  }, []);
 
   const filtered = allProducts.filter(p=>{
     const cat = activeCat==="TOUT"||p.categorie===activeCat;
@@ -745,18 +803,19 @@ export default function App() {
             value={search} onChange={e=>setSearch(e.target.value)}
             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
             onKeyDown={async e=>{
-              if(e.key==='Enter' && search.trim()){
-                // Si que des chiffres → chercher comme code-barres
-                if(/^\d+$/.test(search.trim())){
+              const isEnter = e.key==='Enter' || e.keyCode===13 || e.which===13;
+              if(isEnter && search.trim()){
+                if(/^\d{6,}$/.test(search.trim())){
                   const code = search.trim();
-                  const found = allProducts.find(p=>p.barcode&&String(p.barcode).trim()===code);
-                  if(found){ addToCart(found); setSearch(''); }
+                  setSearch('');
+                  const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===code);
+                  if(found){ addToCart(found); }
                   else {
                     const nom = await lookupBarcode(code);
                     if(nom){
-                      const ok = window.confirm('Produit trouvé :\n"'+nom+'"\n\nAjouter au catalogue ?');
-                      if(ok){ setEditProduct({nom,categorie:'Autres',prix:'',vrac:false,barcode:code,photo_url:''}); setIsNew(true); setShowSettings(true); setSettingsTab('produits'); setSearch(''); }
-                    } else { alert('Code '+code+' non trouvé sur Open Food Facts'); }
+                      const ok = window.confirm('Trouvé: "'+nom+'"\n\nAjouter au catalogue ?');
+                      if(ok){ setEditProduct({nom,categorie:'Autres',prix:'',vrac:false,barcode:code,photo_url:''}); setIsNew(true); setShowSettings(true); setSettingsTab('produits'); }
+                    } else { alert('Code '+code+' inconnu.\nVa dans Produits pour l\'associer manuellement.'); }
                   }
                 }
               }
@@ -847,9 +906,9 @@ export default function App() {
             </div>
             <div style={{display:'flex',gap:6}}>
               <button style={S.remiseBtn} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
-              {discount>0&&<button style={S.clearRemise} onClick={()=>setDiscount(0)}>✕ Remise</button>}
+              {discount>0&&<button style={S.clearRemise} onClick={()=>setDiscount(0)}>✕</button>}
+              <button style={{...S.clearBtn,flexShrink:0}} onClick={newSale}>🗑️</button>
             </div>
-            <button style={S.clearBtn} onClick={newSale}>🗑️ Vider</button>
           </div>
         </div>
       </div>
@@ -1114,8 +1173,10 @@ export default function App() {
               <input style={S.eInput} type="number" step="0.01" value={editProduct.prix} onChange={e=>setEditProduct(p=>({...p,prix:e.target.value}))}/>
               <label style={S.eLabel}>Barcode</label>
               <div style={{display:'flex',gap:8}}>
-                <input style={{...S.eInput,flex:1}} value={editProduct.barcode} onChange={e=>setEditProduct(p=>({...p,barcode:e.target.value}))} placeholder="Ex: 5011061181329"/>
-                <button style={{...S.uploadBtn,padding:'8px 12px',fontSize:16,flexShrink:0}} onClick={startBarcodeScanner}>📷</button>
+                <input style={{...S.eInput,flex:1}} value={editProduct.barcode} 
+                  onChange={e=>setEditProduct(p=>({...p,barcode:e.target.value}))} 
+                  placeholder="Scanne ou tape le code..."
+                  autoFocus={!editProduct.nom}/>
               </div>
               <label style={S.eLabel}>Photo</label>
               <div style={{display:'flex',flexDirection:'column',gap:7}}>
