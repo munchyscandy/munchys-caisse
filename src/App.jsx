@@ -91,6 +91,7 @@ export default function App() {
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
+  const [boxGenPDF, setBoxGenPDF] = useState(false);
   const [boxQuantite, setBoxQuantite] = useState(1);
   const [stockData, setStockData] = useState([]);
   const [editingStock, setEditingStock] = useState(null);
@@ -265,6 +266,72 @@ export default function App() {
         });
       }
     }
+  };
+
+  // Remettre le stock quand on annule des boxes
+  const restoreStock = async (produits, qty_boxes) => {
+    for (const p of produits) {
+      const total = p.qty * qty_boxes;
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/stock?product_nom=eq.${encodeURIComponent(p.nom)}&select=id,quantite`, { headers: SB });
+      const d = await r.json();
+      if (d && d.length > 0) {
+        await fetch(`${SUPABASE_URL}/rest/v1/stock?id=eq.${d[0].id}`, {
+          method:'PATCH', headers:{...SB,Prefer:"return=minimal"},
+          body: JSON.stringify({quantite:(d[0].quantite||0)+total,updated_at:new Date().toISOString()})
+        });
+      }
+    }
+  };
+
+  // Export PDF comptable des boxes
+  const exportBoxesPDF = async () => {
+    const debut = prompt('Date de début (YYYY-MM-DD) :');
+    if(!debut) return;
+    const fin = prompt('Date de fin (YYYY-MM-DD) :');
+    if(!fin) return;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/box_contents?date_vente=gte.${debut}&date_vente=lte.${fin}&order=date_vente&select=*`, { headers: SB });
+    const data = await r.json();
+    if(!Array.isArray(data)||!data.length){ alert('Aucune box sur cette période'); return; }
+    const totalCA = data.reduce((s,b)=>s+parseFloat(b.box_prix||0)*parseInt(b.quantite||1),0);
+    const totalBoxes = data.reduce((s,b)=>s+parseInt(b.quantite||1),0);
+    const w = window.open('about:blank','_blank');
+    w.document.write(`<html><head><title>Rapport Box ${debut} au ${fin}</title>
+    <style>body{font-family:sans-serif;padding:30px;max-width:800px;margin:auto;color:#333}
+    h1{color:#D3518B}table{width:100%;border-collapse:collapse;margin:12px 0}
+    th{background:#D3518B;color:#fff;padding:10px;text-align:left}td{padding:8px;border-bottom:1px solid #eee}
+    .total{background:#78B7A0;color:#fff;font-weight:bold}.right{text-align:right}</style></head>
+    <body>
+    <h1>🍬 Munchy's Candy — Rapport Box Mystère</h1>
+    <p><b>Période :</b> ${debut} au ${fin}</p>
+    <p><b>TVA BE 0750.497.413</b> · Mouscron</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0">
+      <div style="background:#f5f5f5;padding:14px;border-radius:8px;text-align:center">
+        <b style="display:block;font-size:22px;color:#D3518B">${totalBoxes}</b><small>Boxes vendues</small>
+      </div>
+      <div style="background:#f5f5f5;padding:14px;border-radius:8px;text-align:center">
+        <b style="display:block;font-size:22px;color:#D3518B">${totalCA.toFixed(2)}€</b><small>CA Total</small>
+      </div>
+    </div>
+    <table>
+      <tr><th>Date</th><th>Nom</th><th>Prix unit.</th><th>Qté</th><th class="right">Total</th><th>Contenu</th></tr>
+      ${data.map(b=>{
+        const prods=typeof b.produits==='string'?JSON.parse(b.produits):b.produits;
+        const total=(parseFloat(b.box_prix||0)*parseInt(b.quantite||1)).toFixed(2);
+        return `<tr>
+          <td>${b.date_vente}</td>
+          <td>${b.box_nom}</td>
+          <td>${parseFloat(b.box_prix||0).toFixed(2)}€</td>
+          <td>${b.quantite||1}</td>
+          <td class="right"><b>${total}€</b></td>
+          <td style="font-size:11px">${prods.map(p=>p.nom+' x'+p.qty).join(', ')}</td>
+        </tr>`;
+      }).join('')}
+      <tr class="total"><td colspan="4"><b>TOTAL</b></td><td class="right">${totalCA.toFixed(2)}€</td><td></td></tr>
+    </table>
+    <p style="color:#888;font-size:11px;margin-top:20px">Généré le ${new Date().toLocaleString('fr-BE')}</p>
+    <script>window.print();</script>
+    </body></html>`);
+    w.document.close();
   };
 
   const addStock = async (nom, qty_add) => {
@@ -1013,11 +1080,18 @@ export default function App() {
                     <div key={b.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:6}}>
                       <div style={{display:'flex',justifyContent:'space-between',width:'100%',alignItems:'center'}}>
                         <div>
-                          <div style={{fontWeight:800,fontSize:14,color:'#fff'}}>📦 {b.box_nom}</div>
-                          <div style={{fontSize:12,color:'#aaa'}}>{b.date_vente} · {prods.length} produit(s) · {prods.reduce((s,p)=>s+p.prix*p.qty,0).toFixed(2)}€</div>
+                          <div style={{fontWeight:800,fontSize:14,color:'#111'}}>📦 {b.box_nom}</div>
+                          <div style={{fontSize:12,color:'#555'}}>{b.date_vente} · {prods.length} produit(s) · {prods.reduce((s,p)=>s+p.prix*p.qty,0).toFixed(2)}€</div>
                         </div>
                         <div style={{display:'flex',gap:6}}>
-                          <button style={{...S.editBtn,background:'rgba(76,175,80,0.2)',color:'#4caf50'}} onClick={()=>printBox(b)}>🖨️ PDF</button>
+                          <button style={{...S.editBtn,background:'rgba(76,175,80,0.2)',color:'#4caf50'}} onClick={()=>printBox(b)}>🖨️</button>
+                          <button style={{...S.editBtn,background:'rgba(255,165,0,0.2)',color:'#ffa500'}} onClick={async()=>{
+                            const nb = parseInt(prompt('Combien de boxes à annuler (remettre en stock) ?'));
+                            if(!nb||nb<=0) return;
+                            const prods = typeof b.produits==='string'?JSON.parse(b.produits):b.produits;
+                            await restoreStock(prods, nb);
+                            alert(nb+' box(es) annulée(s) — stock remis à jour !');
+                          }}>↩️</button>
                           <button style={S.delBtn} onClick={()=>deleteBox(b.id)}>🗑️</button>
                         </div>
                       </div>
@@ -1214,7 +1288,11 @@ export default function App() {
             </div>
             <div style={S.mBtns}>
               <button style={S.btnCancel} onClick={()=>setEditBox(null)}>Annuler</button>
-              <button style={S.btnConfirm} onClick={saveBox}>💾 Enregistrer</button>
+              <label style={{display:'flex',alignItems:'center',gap:8,fontSize:13,color:'#555',cursor:'pointer'}}>
+                <input type="checkbox" checked={boxGenPDF} onChange={e=>setBoxGenPDF(e.target.checked)} style={{width:16,height:16,cursor:'pointer'}}/>
+                Générer le PDF après enregistrement
+              </label>
+              <button style={S.btnConfirm} onClick={async()=>{ await saveBox(); if(boxGenPDF) printBox(editBox); }}>💾 Enregistrer</button>
             </div>
           </div>
         </div>
