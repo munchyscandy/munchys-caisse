@@ -1189,7 +1189,21 @@ export default function App() {
                   placeholder="Notes comptable..." value={editBox.notes||''} onChange={e=>setEditBox(b=>({...b,notes:e.target.value}))}/>
               </div>
               <div style={{flex:1}}>
-                <input style={S.settingsSearch} placeholder="Chercher..." value={boxSearch} onChange={e=>setBoxSearch(e.target.value)} autoComplete="off"/>
+                <input style={S.settingsSearch} placeholder="🔍 Chercher ou scanner..." 
+                  value={boxSearch} onChange={e=>setBoxSearch(e.target.value)} autoComplete="off"
+                  onKeyDown={e=>{
+                    if(e.key==='Enter' && boxSearch.trim()){
+                      // Si c'est un code-barres (chiffres)
+                      if(/^\d{6,}$/.test(boxSearch.trim())){
+                        const found = allProductsRef.current.find(p=>p.barcode&&String(p.barcode).trim()===boxSearch.trim());
+                        if(found){ addToBox(found); setBoxSearch(''); }
+                        else { alert('Code '+boxSearch+' non trouvé. Associez-le dans Produits.'); setBoxSearch(''); }
+                      } else {
+                        // Si texte et un seul résultat → ajouter direct
+                        if(boxFilteredProducts.length===1){ addToBox(boxFilteredProducts[0]); setBoxSearch(''); }
+                      }
+                    }
+                  }}/>
                 <div style={{maxHeight:280,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
                   {boxFilteredProducts.slice(0,100).map(p=>(
                     <button key={p.id} style={{padding:'6px 10px',borderRadius:8,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#ddd',cursor:'pointer',textAlign:'left',fontSize:12}}
