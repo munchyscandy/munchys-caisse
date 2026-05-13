@@ -931,20 +931,21 @@ export default function App() {
               </div>
             ))}
           </div>
-          <div style={S.footer}>
-            {cagnotteUsed>0&&<div style={S.discRow}><span>🎁 Cagnotte</span><span>−{fmt(cagnotteUsed)}</span></div>}
-            {discountAmt>0&&<div style={S.discRow}><span>💸 Remise {discountType==='percent'?`${discount}%`:''}</span><span>−{fmt(discountAmt)}</span></div>}
-            <div style={S.totalRow}><span>TOTAL TTC</span><span style={S.totalAmt}>{fmt(finalTotal)}</span></div>
-            <div style={S.tvaRow}><span>dont TVA 6%</span><span>{fmt(tva)}</span></div>
-            {client&&<div style={S.tvaRow}><span>Cashback +5%</span><span style={{color:C1}}>+{fmt(cashback)}</span></div>}
-            <div style={{display:'flex',gap:6}}>
-              <button style={{...S.payBtn,...S.payCard}} onClick={()=>cart.length>0&&setModal('payment')} disabled={!cart.length}>💳 CARTE</button>
-              <button style={{...S.payBtn,...S.payCash}} onClick={()=>cart.length>0&&setModal('cash')} disabled={!cart.length}>💵 ESPÈCES</button>
+          <div style={{...S.footer,padding:'6px 8px',gap:4}}>
+            {cagnotteUsed>0&&<div style={{...S.discRow,fontSize:11}}><span>🎁 Cagnotte</span><span>−{fmt(cagnotteUsed)}</span></div>}
+            {discountAmt>0&&<div style={{...S.discRow,fontSize:11}}><span>💸 {discountType==='percent'?`${discount}%`:''}</span><span>−{fmt(discountAmt)}</span></div>}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <span style={{fontSize:12,color:'rgba(255,255,255,0.8)'}}>TOTAL TTC</span>
+              <span style={{...S.totalAmt,fontSize:18}}>{fmt(finalTotal)}</span>
             </div>
-            <div style={{display:'flex',gap:6}}>
-              <button style={S.remiseBtn} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
-              {discount>0&&<button style={S.clearRemise} onClick={()=>setDiscount(0)}>✕</button>}
-              <button style={{...S.clearBtn,flexShrink:0}} onClick={newSale}>🗑️</button>
+            <div style={{display:'flex',gap:5}}>
+              <button style={{...S.payBtn,...S.payCard,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('payment')} disabled={!cart.length}>💳 CARTE</button>
+              <button style={{...S.payBtn,...S.payCash,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('cash')} disabled={!cart.length}>💵 ESPÈCES</button>
+            </div>
+            <div style={{display:'flex',gap:5}}>
+              <button style={{...S.remiseBtn,padding:'7px 6px',fontSize:11}} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
+              {discount>0&&<button style={{...S.clearRemise,padding:'7px 8px',fontSize:11}} onClick={()=>setDiscount(0)}>✕</button>}
+              <button style={{...S.clearBtn,padding:'7px 10px',fontSize:13,flexShrink:0}} onClick={newSale}>🗑️</button>
             </div>
           </div>
         </div>
