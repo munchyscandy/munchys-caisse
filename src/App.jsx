@@ -755,10 +755,7 @@ export default function App() {
 
   const generateExportPDF = async (ok, label, from, to) => {
     // Determine display mode based on period type
-    const displayMode = exportPeriodType==='daily' ? 'detail' :
-                        displayMode==='quarterly' ? 'quarterly' :
-                        exportPeriodType==='monthly' ? 'global' :
-                        exportDetailLevel; // custom = user choice
+    const displayMode = exportPeriodType==='quarterly' && exportDetailLevel==='global' ? 'quarterly' : exportDetailLevel;
     const totalTTC = ok.reduce((s,v)=>s+parseFloat(v.total||0),0);
     const totalTVA = totalTTC * 0.06 / 1.06;
     const totalEsp = ok.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
