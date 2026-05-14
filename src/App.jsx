@@ -1337,7 +1337,7 @@ export default function App() {
                     value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
                   {testMode&&<span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 8px',borderRadius:6}}>🧪 TEST</span>}
                   <button style={{...S.editBtn,background:'rgba(120,183,160,0.15)',color:C2,fontSize:12,padding:'5px 10px'}}
-                    onClick={()=>exportMensuel(journalDate.slice(0,7))}>📥 Export {journalDate.slice(0,7)}</button>
+                    onClick={()=>setShowExportModal(true)}>📥 Exporter</button>
                   <span style={{fontSize:12,color:'#888'}}>💳 <b style={{color:C1}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>💵 <b style={{color:C2}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>Total: <b style={{color:'#fff'}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
