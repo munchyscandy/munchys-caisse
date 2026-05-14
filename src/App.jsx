@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { products as BASE_PRODUCTS } from "./products";
+
 const TVA = 0.06;
 const CASHBACK_RATE = 0.05;
 const VRAC_PRICE_PER_100G = 1.50;
@@ -8,6 +9,7 @@ const SUPABASE_KEY = "sb_publishable_1m5yOZvVzFfXQQYqoN8h_A_nd56vaPI";
 const SB = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json" };
 const fmt = (n) => parseFloat(n||0).toFixed(2).replace('.', ',') + '€';
 const today = () => new Date().toISOString().split('T')[0];
+
 const EMO = {
   "Bonbons":"🍬","Red bull":"🐂","Fanta":"🧃","Coca cola":"🥤","Monster":"🟢",
   "Kinder":"🍫","Snickers& kitkat":"🍫","Chocolat":"🍫","Sucrée":"🍭","Salé":"🥨",
@@ -18,11 +20,13 @@ const EMO = {
 };
 const ALL_CATS = Object.keys(EMO);
 const CATS = ["TOUT", ...ALL_CATS];
+
 // Brand colors RAL 6027 + RAL 4003
 const C1 = '#D3518B';
 const C2 = '#78B7A0';
 const C1d = '#a03568';
 const C2d = '#4a8a72';
+
 export default function App() {
   const [cart, setCart] = useState([]);
   const [activeCat, setActiveCat] = useState("TOUT");
@@ -88,6 +92,8 @@ export default function App() {
   const scanModeRef = useRef('product');
   const settingsTabRef = useRef('produits');
   const showSettingsRef = useRef(false);
+
+
   const [boxes, setBoxes] = useState([]);
   const [editBox, setEditBox] = useState(null);
   const [boxSearch, setBoxSearch] = useState('');
@@ -99,9 +105,11 @@ export default function App() {
   const [stockScanned, setStockScanned] = useState(null); // produit trouvé par scan
   const [stockQty, setStockQty] = useState('');
   const [stockAlert, setStockAlert] = useState('5');
+
   useEffect(() => {
     loadCustomProducts(); loadClients(); loadBoxes(); loadCurrentSession();
     setTimeout(()=>searchRef.current?.focus(), 500);
+
     // Écouteur global douchette scanner
     let barcodeBuffer = '';
     let barcodeTimer = null;
@@ -163,6 +171,7 @@ export default function App() {
       document.head.appendChild(s);
     }
   }, []);
+
   const loadCustomProducts = async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/products_custom?select=*&order=id`, { headers: SB });
@@ -170,6 +179,7 @@ export default function App() {
       if (Array.isArray(d)) setCustomProducts(d);
     } catch(e) {}
   };
+
   const loadClients = async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/customers?select=*&order=name`, { headers: SB });
@@ -177,6 +187,7 @@ export default function App() {
       if (Array.isArray(d)) setAllClients(d);
     } catch(e) {}
   };
+
   const loadVentes = async (date, sess) => {
     try {
       const d = date || new Date().toISOString().split('T')[0];
@@ -193,6 +204,7 @@ export default function App() {
       if (Array.isArray(data)) setVentes(data);
     } catch(e) {}
   };
+
   const loadCurrentSession = async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/sessions_caisse?statut=eq.ouvert&order=created_at.desc&limit=1&select=*`, { headers: SB });
@@ -201,6 +213,7 @@ export default function App() {
       else setSession(null);
     } catch(e) {}
   };
+
   const loadBoxes = async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/box_contents?select=*&order=created_at.desc`, { headers: SB });
@@ -208,6 +221,7 @@ export default function App() {
       if (Array.isArray(d)) setBoxes(d);
     } catch(e) {}
   };
+
   const loadStock = async () => {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/stock?select=*&order=product_nom`, { headers: SB });
@@ -215,6 +229,7 @@ export default function App() {
       if (Array.isArray(d)) setStockData(d);
     } catch(e) {}
   };
+
   const loadClosingData = async (sess) => {
     setClosingData({especes:0,carte:0,nb:0,loaded:false});
     try {
@@ -227,6 +242,7 @@ export default function App() {
       }
     } catch(e) { setClosingData({especes:0,carte:0,nb:0,loaded:true}); }
   };
+
   const upsertStock = async (nom, qty, seuil) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/stock?product_nom=eq.${encodeURIComponent(nom)}&select=id`, { headers: SB });
     const d = await r.json();
@@ -243,6 +259,7 @@ export default function App() {
     }
     loadStock();
   };
+
   const deductStock = async (produits, qty_boxes) => {
     for (const p of produits) {
       const total = p.qty * qty_boxes;
@@ -256,6 +273,7 @@ export default function App() {
       }
     }
   };
+
   // Remettre le stock quand on annule des boxes
   const restoreStock = async (produits, qty_boxes) => {
     for (const p of produits) {
@@ -270,6 +288,7 @@ export default function App() {
       }
     }
   };
+
   // Export PDF comptable des boxes
   const exportBoxesPDF = async () => {
     const debut = prompt('Date de début (YYYY-MM-DD) :');
@@ -320,6 +339,7 @@ export default function App() {
     </body></html>`);
     w.document.close();
   };
+
   const addStock = async (nom, qty_add) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/stock?product_nom=eq.${encodeURIComponent(nom)}&select=id,quantite`, { headers: SB });
     const d = await r.json();
@@ -331,6 +351,7 @@ export default function App() {
       loadStock();
     }
   };
+
   const allProducts = (() => {
     const hidden = new Set(customProducts.filter(p=>!p.actif&&p.base_product_id!=null).map(p=>p.base_product_id));
     const overridden = new Set(customProducts.filter(p=>p.actif&&p.base_product_id!=null).map(p=>p.base_product_id));
@@ -343,10 +364,12 @@ export default function App() {
     }));
     return [...custom,...base];
   })();
+
   allProductsRef.current = allProducts;
   scanModeRef.current = scanMode;
   settingsTabRef.current = settingsTab;
   showSettingsRef.current = showSettings;
+
   // Handle barcode product add from global listener
   useEffect(()=>{
     const handler = () => {
@@ -362,6 +385,7 @@ export default function App() {
     document.addEventListener('addProductFromBarcode', handler);
     return () => document.removeEventListener('addProductFromBarcode', handler);
   }, []);
+
   useEffect(()=>{
     const handler = (e) => {
       const el = document.getElementById('stock-item-'+e.detail);
@@ -370,17 +394,20 @@ export default function App() {
     document.addEventListener('scrollToStock', handler);
     return () => document.removeEventListener('scrollToStock', handler);
   }, []);
+
   // Refocus scanner input when not in modal/settings
   const refocusScanner = () => {
     if(!showSettings && !modal && scanInputRef.current) {
       searchRef.current?.focus();
     }
   };
+
   const filtered = allProducts.filter(p=>{
     const cat = activeCat==="TOUT"||p.categorie===activeCat;
     const s = !search||p.nom.toLowerCase().includes(search.toLowerCase());
     return cat&&s;
   });
+
   const cartTotal = cart.reduce((s,i)=>s+i.prix*i.qty,0);
   const cagnotte = client?(client.cagnotte||0):0;
   const cagnotteUsed = (client&&useCagnotte)?Math.min(cagnotte,cartTotal):0;
@@ -390,6 +417,7 @@ export default function App() {
   const finalTotal = Math.max(0,cartTotal-cagnotteUsed-discountAmt);
   const tva = finalTotal*TVA/(1+TVA);
   const cashback = finalTotal*CASHBACK_RATE;
+
   const addToCart = useCallback((p,px=null)=>{
     const prix = px!==null?px:p.prix;
     setCart(prev=>{
@@ -400,10 +428,12 @@ export default function App() {
       return [...prev,{...p,prix,qty:1,cartId:Date.now()}];
     });
   },[]);
+
   const removeItem = (cid) => setCart(p=>p.filter(i=>i.cartId!==cid));
   const updateQty = (cid,d) => setCart(p=>
     p.map(i=>i.cartId!==cid?i:i.qty+d<=0?null:{...i,qty:i.qty+d}).filter(Boolean)
   );
+
   const handleBarcode = (e) => {
     if(e.key==='Enter'&&barcode.trim()){
       const f=allProducts.find(p=>p.barcode===barcode.trim());
@@ -412,6 +442,7 @@ export default function App() {
       setBarcode('');
     }
   };
+
   const handleVrac = () => {
     const g=parseFloat(vracG);
     if(!g||g<=0) return;
@@ -419,6 +450,7 @@ export default function App() {
     addToCart({...p,nom:`Bonbons vrac (${g}g)`,cartId:Date.now()},g/100*VRAC_PRICE_PER_100G);
     setVracG('');setModal(null);
   };
+
   const searchClient = (q) => {
     if(!q.trim()){setLoyResults([]);return;}
     const ql=q.toLowerCase();
@@ -428,11 +460,13 @@ export default function App() {
       (c.email&&c.email.toLowerCase().includes(ql))
     ));
   };
+
   const applyDiscount = () => {
     const v=parseFloat(discountInput.replace(',','.'));
     if(!v||v<=0){alert("Valeur invalide");return;}
     setDiscount(v);setModal(null);
   };
+
   const handlePayment = async (method) => {
     if(client&&!testMode){
       const newCag=cagnotte-cagnotteUsed+cashback;
@@ -461,16 +495,19 @@ export default function App() {
     setReceipt({cart:[...cart],cartTotal,cagnotteUsed,discountAmt,finalTotal,tva,cashback,method,client,date:new Date()});
     setModal('receipt');
   };
+
   const newSale = () => {
     setCart([]);setClient(null);setUseCagnotte(false);setDiscount(0);
     setDiscountInput('');setModal(null);setReceipt(null);setSearch('');
   };
+
   const startBarcodeScanner = () => setShowBarcodeScanner(true);
   const stopBarcodeScanner = () => {
     setShowBarcodeScanner(false);
     if(window._barcodeStream){window._barcodeStream.getTracks().forEach(t=>t.stop());window._barcodeStream=null;}
     clearInterval(window._barcodeInterval);
   };
+
   const uploadPhoto = async (file) => {
     setUploading(true);
     try {
@@ -483,6 +520,7 @@ export default function App() {
     } catch(e){alert("Erreur: "+e.message);}
     setUploading(false);
   };
+
   const openEdit = (p,nouveau=false) => {
     if(nouveau){setEditProduct({nom:'',categorie:'Bonbons',prix:'',vrac:false,barcode:'',photo_url:''});setIsNew(true);}
     else {
@@ -495,6 +533,7 @@ export default function App() {
       setIsNew(false);
     }
   };
+
   const saveProduct = async () => {
     if(!editProduct.nom||editProduct.prix===''){alert("Nom et prix requis");return;}
     setSaving(true);
@@ -519,6 +558,7 @@ export default function App() {
     } catch(e){alert("Erreur: "+e.message);}
     setSaving(false);
   };
+
   const deleteProduct = async (cid) => {
     if(!confirm("Supprimer définitivement ?")) return;
     await fetch(`${SUPABASE_URL}/rest/v1/products_custom?id=eq.${cid}`,{
@@ -526,6 +566,7 @@ export default function App() {
     });
     loadCustomProducts();
   };
+
   const hideBaseProduct = async (p) => {
     if(!confirm(`Supprimer "${p.nom}" du catalogue ?`)) return;
     await fetch(`${SUPABASE_URL}/rest/v1/products_custom`,{
@@ -534,6 +575,7 @@ export default function App() {
     });
     loadCustomProducts();
   };
+
   const newBox = () => setEditBox({nom:'Box Mystère 10€',prix:10,date:today(),produits:[],notes:''});
   const addToBox = (p) => setEditBox(b=>{
     const ex=b.produits.find(i=>i.id===p.id);
@@ -541,6 +583,7 @@ export default function App() {
     return {...b,produits:[...b.produits,{id:p.id,nom:p.nom,prix:p.prix,qty:1}]};
   });
   const removeFromBox = (id) => setEditBox(b=>({...b,produits:b.produits.filter(i=>i.id!==id)}));
+
   const saveBox = async () => {
     if(!editBox.produits.length){alert("Ajoutez au moins un produit");return;}
     const qty=boxQuantite||1;
@@ -554,11 +597,13 @@ export default function App() {
     setEditBox(null);setBoxQuantite(1);
     alert(`✅ ${qty} box(es) enregistrée(s) — stock mis à jour !`);
   };
+
   const deleteBox = async (id) => {
     if(!confirm("Supprimer cette box ?")) return;
     await fetch(`${SUPABASE_URL}/rest/v1/box_contents?id=eq.${id}`,{method:'DELETE',headers:SB});
     loadBoxes();
   };
+
   const printBox = (box) => {
     const produits=typeof box.produits==='string'?JSON.parse(box.produits):box.produits;
     const total=produits.reduce((s,p)=>s+p.prix*p.qty,0);
@@ -572,10 +617,12 @@ export default function App() {
     <p style="color:#888;font-size:11px">Généré le ${new Date().toLocaleString('fr-BE')}</p>
     <script>window.print();window.close();</script></body></html>`);
   };
+
   const tryUnlock = () => {
     if(pinInput===PIN_CODE){setPinUnlocked(true);setShowPinModal(false);setShowSettings(true);setPinInput('');}
     else{alert('Code PIN incorrect');setPinInput('');}
   };
+
   const ouvrirSession = async () => {
     const m=parseFloat(String(montantOuverture).replace(',','.'));
     if(isNaN(m)){alert("Entrez un montant");return;}
@@ -586,6 +633,7 @@ export default function App() {
     await loadCurrentSession();
     setShowOpenSession(false);setMontantOuverture('');
   };
+
   const fermerSession = async () => {
     const mf=parseFloat(String(montantFermeture).replace(',','.'));
     if(montantFermeture===''||isNaN(mf)){alert("Entrez le montant compté en caisse !");return;}
@@ -628,6 +676,7 @@ export default function App() {
       ?"⚠️ Caisse fermée avec écart justifié\nÉcart: "+(ecart>0?"+":"")+ecart.toFixed(2)+"€\nRécap envoyé par email !"
       :"✅ Caisse fermée — comptes JUSTES !\nEspèces: "+especes.toFixed(2)+"€ | Carte: "+carte.toFixed(2)+"€\nRécap envoyé par email !");
   };
+
   const envoyerRecapFermeture = async (especes,carte,ouverture,mf,ecart,note) => {
     const date=new Date().toLocaleDateString('fr-BE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
     const html=`<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px">
@@ -652,7 +701,7 @@ export default function App() {
         method:"POST",
         headers:{
           "Content-Type":"application/json",
-          "Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtva3N6ZmJya3hscmZoZXV6dXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0MDQ5MjcsImV4cCI6MjA5Mzk4MDkyN30.ft0llFp29j9kNg4LgSvvQ_nJd7GkfAcATY2TwrTTQ_w"
+          "Authorization":"Bearer sb_publishable_1m5yOZvVzFfXQQYqoN8h_A_nd56vaPI"
         },
         body:JSON.stringify({
           to:"contact.kalice@gmail.com",
@@ -670,6 +719,7 @@ export default function App() {
       alert("❌ Erreur: "+e.message);
     }
   };
+
   const getExportDates = () => {
     const today = new Date();
     const y = today.getFullYear();
@@ -690,6 +740,7 @@ export default function App() {
       return {from:exportDateFrom, to:exportDateTo, label:`Du ${exportDateFrom} au ${exportDateTo}`};
     }
   };
+
   const runExport = async () => {
     const {from, to, label} = getExportDates();
     const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${from}T00:00:00&date_heure=lte.${to}T23:59:59&order=date_heure&select=*`, { headers: SB });
@@ -701,11 +752,13 @@ export default function App() {
     if(exportFormat==='csv'||exportFormat==='both') await exportCSV(from, to);
     setShowExportModal(false);
   };
+
   const generateExportPDF = async (ok, label, from, to) => {
     const totalTTC = ok.reduce((s,v)=>s+parseFloat(v.total||0),0);
     const totalTVA = totalTTC * 0.06 / 1.06;
     const totalEsp = ok.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
     const totalCarte = ok.filter(v=>v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0);
+
     // Grouper par jour
     const parJour = {};
     ok.forEach(v=>{
@@ -716,6 +769,7 @@ export default function App() {
       parJour[j].nb++;
       parJour[j].ventes.push(v);
     });
+
     // Grouper par client si besoin
     const parClient = {};
     if(exportDetailLevel==='client'){
@@ -726,6 +780,7 @@ export default function App() {
         parClient[c].nb++;
       });
     }
+
     const w = window.open('about:blank','_blank');
     w.document.write(`<html><head><title>Export ${label}</title>
     <style>
@@ -753,6 +808,7 @@ export default function App() {
       <div class="box"><b>${totalTVA.toFixed(2)}€</b><small>TVA 6%</small></div>
       <div class="box"><b>${(totalTTC-totalTVA).toFixed(2)}€</b><small>CA HT</small></div>
     </div>
+
     ${exportDetailLevel==='global' ? `
     <h2>Récapitulatif par jour</h2>
     <table>
@@ -766,6 +822,7 @@ export default function App() {
         </tr>`).join('')}
       <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
     </table>` : ''}
+
     ${exportDetailLevel==='detail' ? `
     <h2>Détail de toutes les ventes</h2>
     <table>
@@ -783,6 +840,7 @@ export default function App() {
       }).join('')}
       <tr class="total-row"><td colspan="4">TOTAL — ${ok.length} ventes</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
+
     ${exportDetailLevel==='client' ? `
     <h2>Récapitulatif par client</h2>
     <table>
@@ -795,11 +853,13 @@ export default function App() {
         </tr>`).join('')}
       <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
+
     <p style="color:#888;font-size:10px;margin-top:30px">Munchy's Candy · Société Kalice TVA BE 0750.497.413 · Export comptable ${label}</p>
     <script>setTimeout(()=>window.print(),500);</script>
     </body></html>`);
     w.document.close();
   };
+
   const exportCSV = async (dateFrom, dateTo) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${dateFrom}T00:00:00&date_heure=lte.${dateTo}T23:59:59&order=date_heure&select=*`, { headers: SB });
     const data = await r.json();
@@ -846,6 +906,7 @@ export default function App() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
   const exportPeriode = async (dateFrom, dateTo) => {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${dateFrom}T00:00:00&date_heure=lte.${dateTo}T23:59:59&order=date_heure&select=*`, { headers: SB });
     const data = await r.json();
@@ -923,6 +984,7 @@ export default function App() {
     w.document.close();
     setTimeout(()=>{ try{ w.print(); }catch(e){} }, 800);
   };
+
   const exportMensuel = async (mois) => {
     const [annee,m]=mois.split('-');
     const r=await fetch(`${SUPABASE_URL}/rest/v1/ventes?date_heure=gte.${mois}-01T00:00:00&date_heure=lte.${mois}-31T23:59:59&order=date_heure&select=*`,{headers:SB});
@@ -972,6 +1034,7 @@ export default function App() {
     <p style="color:#888;font-size:11px">Généré le ${new Date().toLocaleString('fr-BE')}</p>
     <script>window.print();</script></body></html>`);
   };
+
   // ANNULER VENTE - avec gestion erreur
   const annulerVente = async (id, motif) => {
     if(!motif||!motif.trim()){alert("Motif obligatoire");return;}
@@ -995,6 +1058,7 @@ export default function App() {
       }
     }catch(e){alert("❌ Erreur réseau: "+e.message);}
   };
+
   // Recherche Open Food Facts si produit non trouvé localement
   const lookupBarcode = async (code) => {
     try {
@@ -1009,6 +1073,7 @@ export default function App() {
     } catch(e) {}
     return null;
   };
+
   const sendReceiptByEmail = async (email, r) => {
     if(!email||!email.includes('@')){ alert('Email invalide'); return; }
     setSendingReceiptEmail(true);
@@ -1042,6 +1107,7 @@ export default function App() {
     } catch(e){ alert('❌ Erreur: '+e.message); }
     setSendingReceiptEmail(false);
   };
+
   const sendEmail = async () => {
     if(!emailSubject||!emailBody){alert("Remplissez tous les champs");return;}
     setSendingEmail(true);
@@ -1057,9 +1123,11 @@ export default function App() {
     }catch(e){alert("Erreur: "+e.message);}
     setSendingEmail(false);
   };
+
   const boxFilteredProducts = allProducts.filter(p=>!boxSearch||p.nom.toLowerCase().includes(boxSearch.toLowerCase()));
   const settingsProducts = allProducts.filter(p=>!settingsSearch||p.nom.toLowerCase().includes(settingsSearch.toLowerCase()));
   const displayVentes = testMode?testVentes:ventes;
+
   return (
     <div style={S.app}>
       <div style={S.header}>
@@ -1103,6 +1171,7 @@ export default function App() {
           <button style={S.btnD} onClick={()=>{if(pinUnlocked){setShowSettings(true);loadStock();}else{setShowPinModal(true);}}}>⚙️</button>
         </div>
       </div>
+
       <div style={S.main}>
         <div style={S.left}>
           <div style={S.catBar}>
@@ -1124,6 +1193,7 @@ export default function App() {
             ))}
           </div>
         </div>
+
         <div style={S.right}>
           <div style={S.cartHead}>
             🛒 CAISSE {testMode&&<span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 7px',borderRadius:6,marginLeft:8}}>🧪 TEST</span>}
@@ -1178,6 +1248,7 @@ export default function App() {
           </div>
         </div>
       </div>
+
       {/* SETTINGS */}
       {showSettings&&(
         <div style={S.settingsOverlay}>
@@ -1201,6 +1272,7 @@ export default function App() {
                 <button style={S.settingsClose} onClick={()=>setShowSettings(false)}>✕</button>
               </div>
             </div>
+
             {settingsTab==='produits'&&(
               <>
                 <input style={S.settingsSearch} placeholder="Rechercher..." value={settingsSearch} onChange={e=>setSettingsSearch(e.target.value)} autoComplete="off"/>
@@ -1225,6 +1297,7 @@ export default function App() {
                 </div>
               </>
             )}
+
             {settingsTab==='box'&&(
               <div style={S.settingsList}>
                 {!boxes.length&&<div style={{color:'#888',textAlign:'center',padding:30}}>Aucune box enregistrée</div>}
@@ -1256,6 +1329,7 @@ export default function App() {
                 })}
               </div>
             )}
+
             {settingsTab==='ventes'&&(
               <>
                 <div style={{padding:'10px 16px 6px',display:'flex',gap:10,alignItems:'center',flexShrink:0,flexWrap:'wrap'}}>
@@ -1263,7 +1337,7 @@ export default function App() {
                     value={journalDate} onChange={e=>{setJournalDate(e.target.value);loadVentes(e.target.value);}}/>
                   {testMode&&<span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 8px',borderRadius:6}}>🧪 TEST</span>}
                   <button style={{...S.editBtn,background:'rgba(120,183,160,0.15)',color:C2,fontSize:12,padding:'5px 10px'}}
-                    onClick={()=>setShowExportModal(true)}>📥 Exporter</button>
+                    onClick={()=>exportMensuel(journalDate.slice(0,7))}>📥 Export {journalDate.slice(0,7)}</button>
                   <span style={{fontSize:12,color:'#888'}}>💳 <b style={{color:C1}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>💵 <b style={{color:C2}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>Total: <b style={{color:'#fff'}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
@@ -1298,11 +1372,11 @@ export default function App() {
                         {v.remise>0&&<div style={{fontSize:11,color:'#ffa500'}}>Remise: -{parseFloat(v.remise).toFixed(2)}€</div>}
                       </div>
                     );
-                    })
-            
+                  })}
                 </div>
               </>
             )}
+
             {settingsTab==='caisse'&&(
               <div style={{padding:20,flex:1,overflowY:'auto'}}>
                 {!session?(
@@ -1322,6 +1396,7 @@ export default function App() {
                 )}
               </div>
             )}
+
             {settingsTab==='stock'&&(
               <>
                 <div style={{display:'flex',gap:8,margin:'10px 14px 6px',alignItems:'center'}}>
@@ -1362,6 +1437,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* EDIT STOCK */}
       {editingStock&&(
         <div style={S.overlay}>
@@ -1380,6 +1456,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* EDIT BOX */}
       {editBox&&(
         <div style={S.overlay}>
@@ -1446,6 +1523,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* EDIT PRODUCT */}
       {editProduct&&(
         <div style={S.overlay}>
@@ -1500,6 +1578,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* DISCOUNT */}
       {modal==='discount'&&(
         <div style={S.overlay}><div style={S.modal}>
@@ -1515,6 +1594,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* LOYALTY */}
       {modal==='loyalty'&&(
         <div style={S.overlay}><div style={{...S.modal,width:460}}>
@@ -1543,6 +1623,7 @@ export default function App() {
           <button style={S.btnCancel} onClick={()=>{setModal(null);setLoySearch('');setLoyResults([]);}}>Annuler</button>
         </div></div>
       )}
+
       {/* VRAC */}
       {modal==='vrac'&&(
         <div style={S.overlay}><div style={S.modal}>
@@ -1563,6 +1644,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* CASH */}
       {modal==='cash'&&(
         <div style={S.overlay}><div style={S.modal}>
@@ -1597,6 +1679,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* PAYMENT CARTE */}
       {modal==='payment'&&(
         <div style={S.overlay}><div style={S.modal}>
@@ -1609,6 +1692,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* RECEIPT */}
       {modal==='receipt'&&receipt&&(
         <div style={S.overlay}>
@@ -1662,6 +1746,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* EMAIL */}
       {emailClient&&(
         <div style={S.overlay}><div style={{...S.modal,width:500}}>
@@ -1676,6 +1761,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* BARCODE SCANNER */}
       {showBarcodeScanner&&(editProduct||scanMode==='cart')&&(
         <div style={{...S.overlay,zIndex:400}}>
@@ -1739,6 +1825,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* CART SCANNER - désactivé, utilise showBarcodeScanner en mode cart */}
       {false&&(
         <div style={{...S.overlay,zIndex:350}}>
@@ -1785,6 +1872,7 @@ export default function App() {
           </div>
         </div>
       )}
+
       {/* PIN */}
       {showPinModal&&(
         <div style={S.overlay}><div style={{...S.modal,width:320,textAlign:'center'}}>
@@ -1807,6 +1895,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* OUVRIR SESSION */}
       {showOpenSession&&(
         <div style={S.overlay}><div style={{...S.modal,width:380}}>
@@ -1821,6 +1910,7 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* FERMER SESSION */}
       {showCloseSession&&session&&(
         <div style={S.overlay}><div style={{...S.modal,width:440}}>
@@ -1869,12 +1959,15 @@ export default function App() {
           </div>
         </div></div>
       )}
+
       {/* Douchette: géré via searchRef ci-dessus */}
+
       {/* EXPORT MODAL */}
       {showExportModal&&(
         <div style={S.overlay}>
           <div style={{...S.modal,width:480}} className="settings-content">
             <h2 style={{...S.mTitle,color:'#111'}}>📥 Exporter les ventes</h2>
+
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📅 Période</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
@@ -1894,6 +1987,7 @@ export default function App() {
                 </div>
               )}
             </div>
+
             <div style={{marginBottom:16}}>
               <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📊 Niveau de détail</div>
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -1905,6 +1999,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+
             <div style={{marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📄 Format</div>
               <div style={{display:'flex',gap:8}}>
@@ -1916,6 +2011,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+
             <div style={S.mBtns}>
               <button style={S.btnCancel} onClick={()=>setShowExportModal(false)}>Annuler</button>
               <button style={S.btnConfirm} onClick={runExport}>📥 Générer l'export</button>
@@ -1923,9 +2019,11 @@ export default function App() {
           </div>
         </div>
       )}
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
+
         body{font-family:'Nunito',sans-serif;background:#78B7A0;color:#111;height:100dvh;overflow:hidden}
         button:disabled{opacity:0.4;cursor:not-allowed}
         /* Settings - texte noir */
@@ -1950,6 +2048,7 @@ export default function App() {
     </div>
   );
 }
+
 const S = {
   app:{display:'flex',flexDirection:'column',height:'100dvh',background:'#78B7A0',color:'#fff',fontFamily:"'Nunito',sans-serif",overflow:'hidden'},
   header:{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',background:'linear-gradient(135deg,#D3518B 0%,#a03568 50%,#3d7a63 100%)',boxShadow:'0 4px 20px rgba(0,0,0,0.3)',flexShrink:0},
