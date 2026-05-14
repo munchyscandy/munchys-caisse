@@ -770,6 +770,15 @@ export default function App() {
       parJour[j].ventes.push(v);
     });
 
+    // Grouper par mois (trimestriel)
+    const parMois = {};
+    ok.forEach(v=>{
+      const mois = v.date_heure.substring(0,7);
+      if(!parMois[mois]) parMois[mois]={esp:0,carte:0,nb:0};
+      if(v.paiement==='espèces') parMois[mois].esp+=parseFloat(v.total||0);
+      else parMois[mois].carte+=parseFloat(v.total||0);
+      parMois[mois].nb++;
+    });
     // Grouper par client si besoin
     const parClient = {};
     if(exportDetailLevel==='client'){
@@ -809,7 +818,7 @@ export default function App() {
       <div class="box"><b>${(totalTTC-totalTVA).toFixed(2)}€</b><small>CA HT</small></div>
     </div>
 
-    ${exportDetailLevel==='global' ? `
+    ${(exportPeriodType==='monthly'||exportPeriodType==='custom'&&exportDetailLevel==='global'||exportPeriodType==='daily'&&exportDetailLevel==='global') ? `
     <h2>Récapitulatif par jour</h2>
     <table>
       <tr><th>Date</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
@@ -823,7 +832,7 @@ export default function App() {
       <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
     </table>` : ''}
 
-    ${exportDetailLevel==='detail' ? `
+    ${(exportPeriodType==='daily'||exportPeriodType==='custom'&&exportDetailLevel==='detail') ? `
     <h2>Détail de toutes les ventes</h2>
     <table>
       <tr><th>Date/Heure</th><th>Articles</th><th>Client</th><th class="right">Remise</th><th class="right">Total</th><th>Paiement</th></tr>
@@ -841,7 +850,7 @@ export default function App() {
       <tr class="total-row"><td colspan="4">TOTAL — ${ok.length} ventes</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
-    ${exportDetailLevel==='client' ? `
+    ${(exportPeriodType==='custom'&&exportDetailLevel==='client') ? `
     <h2>Récapitulatif par client</h2>
     <table>
       <tr><th>Client</th><th>Nb achats</th><th class="right">Total dépensé</th><th class="right">Moyenne/achat</th></tr>
@@ -854,6 +863,20 @@ export default function App() {
       <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
+    \${exportPeriodType==='quarterly' ? `
+    <h2>Récapitulatif par mois</h2>
+    <table>
+      <tr><th>Mois</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
+      \${Object.entries(parMois).map(([mois,d])=>`
+        <tr>
+          <td>\${new Date(mois+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</td>
+          <td>\${d.nb}</td>
+          <td class="right">\${d.esp.toFixed(2)}€</td>
+          <td class="right">\${d.carte.toFixed(2)}€</td>
+          <td class="right"><b>\${(d.esp+d.carte).toFixed(2)}€</b></td>
+        </tr>`).join('')}
+      <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">\${totalEsp.toFixed(2)}€</td><td class="right">\${totalCarte.toFixed(2)}€</td><td class="right">\${totalTTC.toFixed(2)}€</td></tr>
+    </table>` : ''}
     <p style="color:#888;font-size:10px;margin-top:30px">Munchy's Candy · Société Kalice TVA BE 0750.497.413 · Export comptable ${label}</p>
     <script>setTimeout(()=>window.print(),500);</script>
     </body></html>`);
