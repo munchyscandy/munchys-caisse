@@ -731,7 +731,7 @@ export default function App() {
       const from = new Date(y,m,1).toISOString().split('T')[0];
       const to = new Date(y,m+1,0).toISOString().split('T')[0];
       return {from,to,label:'Mensuel - '+today.toLocaleDateString('fr-BE',{month:'long',year:'numeric'})};
-    } else if(exportPeriodType==='quarterly'){
+    } else if(displayMode==='quarterly'){
       const q = Math.floor(m/3);
       const from = new Date(y,q*3,1).toISOString().split('T')[0];
       const to = new Date(y,q*3+3,0).toISOString().split('T')[0];
@@ -754,6 +754,11 @@ export default function App() {
   };
 
   const generateExportPDF = async (ok, label, from, to) => {
+    // Determine display mode based on period type
+    const displayMode = exportPeriodType==='daily' ? 'detail' :
+                        displayMode==='quarterly' ? 'quarterly' :
+                        exportPeriodType==='monthly' ? 'global' :
+                        exportDetailLevel; // custom = user choice
     const totalTTC = ok.reduce((s,v)=>s+parseFloat(v.total||0),0);
     const totalTVA = totalTTC * 0.06 / 1.06;
     const totalEsp = ok.filter(v=>v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0);
@@ -818,7 +823,7 @@ export default function App() {
       <div class="box"><b>${(totalTTC-totalTVA).toFixed(2)}€</b><small>CA HT</small></div>
     </div>
 
-    ${(exportPeriodType==='monthly'||exportPeriodType==='custom'&&exportDetailLevel==='global'||exportPeriodType==='daily'&&exportDetailLevel==='global') ? `
+    ${displayMode==='global' ? `
     <h2>Récapitulatif par jour</h2>
     <table>
       <tr><th>Date</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
@@ -832,7 +837,7 @@ export default function App() {
       <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
     </table>` : ''}
 
-    ${(exportPeriodType==='daily'||exportPeriodType==='custom'&&exportDetailLevel==='detail') ? `
+    ${displayMode==='detail' ? `
     <h2>Détail de toutes les ventes</h2>
     <table>
       <tr><th>Date/Heure</th><th>Articles</th><th>Client</th><th class="right">Remise</th><th class="right">Total</th><th>Paiement</th></tr>
@@ -850,7 +855,7 @@ export default function App() {
       <tr class="total-row"><td colspan="4">TOTAL — ${ok.length} ventes</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
-    ${(exportPeriodType==='custom'&&exportDetailLevel==='client') ? `
+    ${displayMode==='client' ? `
     <h2>Récapitulatif par client</h2>
     <table>
       <tr><th>Client</th><th>Nb achats</th><th class="right">Total dépensé</th><th class="right">Moyenne/achat</th></tr>
@@ -863,7 +868,7 @@ export default function App() {
       <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
-    \${exportPeriodType==='quarterly' ? `
+    \${displayMode==='quarterly' ? `
     <h2>Récapitulatif par mois</h2>
     <table>
       <tr><th>Mois</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
@@ -2012,9 +2017,20 @@ export default function App() {
             </div>
 
             <div style={{marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📊 Niveau de détail</div>
+              <div style={{fontSize:13,fontWeight:700,color:'#555',marginBottom:8}}>📊 Contenu du rapport</div>
+
+
               <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                {[['global','Vue globale — récap par jour (pour comptable)'],['detail','Vue détaillée — chaque vente (toutes les transactions)'],['client','Par client — dépenses par client fidélité']].map(([v,l])=>(
+                {[
+                  ['global', exportPeriodType==='daily'
+                    ? 'Total du jour (1 ligne : espèces + carte + total)'
+                    : exportPeriodType==='monthly'
+                    ? 'Total par jour — 1 ligne par journée du mois'
+                    : 'Total par mois — 1 ligne par mois'],
+                  ['detail', exportPeriodType==='daily'
+                    ? 'Détail complet — chaque vente de la journée'
+                    : 'Détail complet — chaque vente du mois/trimestre']
+                ].map(([v,l])=>(
                   <label key={v} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',borderRadius:8,border:`2px solid ${exportDetailLevel===v?'#D3518B':'#ddd'}`,cursor:'pointer',background:exportDetailLevel===v?'#fff0f6':'#fafafa',fontSize:13}}>
                     <input type="radio" name="detail" value={v} checked={exportDetailLevel===v} onChange={()=>setExportDetailLevel(v)} style={{accentColor:'#D3518B'}}/>
                     {l}
