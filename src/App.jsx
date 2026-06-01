@@ -772,14 +772,16 @@ export default function App() {
       const d = today.toISOString().split('T')[0];
       return {from:d, to:d, label:'Journalier - '+today.toLocaleDateString('fr-BE')};
     } else if(exportPeriodType==='monthly'){
-      const from = new Date(y,m,1).toISOString().split('T')[0];
-      const to = new Date(y,m+1,0).toISOString().split('T')[0];
-      return {from,to,label:'Mensuel - '+today.toLocaleDateString('fr-BE',{month:'long',year:'numeric'})};
-    } else if(displayMode==='quarterly'){
-      const q = Math.floor(m/3);
-      const from = new Date(y,q*3,1).toISOString().split('T')[0];
-      const to = new Date(y,q*3+3,0).toISOString().split('T')[0];
-      return {from,to,label:`T${q+1} ${y}`};
+      const [my,mm] = exportMonth.split('-').map(Number);
+      const from = new Date(my,mm-1,1).toISOString().split('T')[0];
+      const to = new Date(my,mm,0).toISOString().split('T')[0];
+      const label = new Date(my,mm-1,15).toLocaleDateString('fr-BE',{month:'long',year:'numeric'});
+      return {from, to, label:'Mensuel - '+label};
+    } else if(exportPeriodType==='quarterly'){
+      const [qy,qs] = exportQuarter.split('-Q').map(Number);
+      const from = new Date(qy,(qs-1)*3,1).toISOString().split('T')[0];
+      const to = new Date(qy,qs*3,0).toISOString().split('T')[0];
+      return {from, to, label:'T'+qs+' '+qy};
     } else {
       return {from:exportDateFrom, to:exportDateTo, label:`Du ${exportDateFrom} au ${exportDateTo}`};
     }
@@ -1723,26 +1725,24 @@ export default function App() {
       {modal==='cash'&&(
         <div style={S.overlay}><div style={S.modal}>
           <h2 style={S.mTitle}>💵 Paiement espèces</h2>
-          <div style={{fontSize:42,fontWeight:900,textAlign:'center',color:'#111',marginBottom:6,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
-          <p style={{color:'#555',fontSize:12,textAlign:'center',marginBottom:16}}>Montant à encaisser</p>
-          <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💶 Montant donné (optionnel)</label>
-          <input style={{...S.eInput,fontSize:26,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
+          <div style={{fontSize:36,fontWeight:900,textAlign:'center',color:'#111',marginBottom:4,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
+          <p style={{color:'#555',fontSize:12,textAlign:'center',marginBottom:14}}>Total à payer</p>
+          <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💵 Montant donné en espèces</label>
+          <input style={{...S.eInput,fontSize:28,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
             type="number" step="0.01" min="0" placeholder="0,00" value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
-          {montantDonne&&parseFloat(montantDonne)>=finalTotal&&(
-            <div style={{background:`linear-gradient(135deg,rgba(120,183,160,0.15),rgba(120,183,160,0.08))`,border:`1px solid rgba(120,183,160,0.3)`,borderRadius:14,padding:'14px 20px',marginBottom:16,textAlign:'center'}}>
-              <div style={{fontSize:13,color:'#6a8a78',marginBottom:4}}>Monnaie à rendre</div>
-              <div style={{fontSize:38,fontWeight:900,color:C2,letterSpacing:'-1px'}}>{fmt(parseFloat(montantDonne)-finalTotal)}</div>
+          {montantDonne&&parseFloat(montantDonne)>0&&(
+            <div style={{borderRadius:12,padding:'12px',marginBottom:12,textAlign:'center',
+              background:parseFloat(montantDonne)>=finalTotal?'rgba(46,125,50,0.1)':'rgba(120,183,160,0.1)',
+              border:'1px solid rgba(120,183,160,0.3)'}}>
+              {parseFloat(montantDonne)>=finalTotal
+                ? <><div style={{fontSize:12,color:'#555'}}>Monnaie à rendre</div><div style={{fontSize:32,fontWeight:900,color:C2}}>{fmt(parseFloat(montantDonne)-finalTotal)}</div></>
+                : <><div style={{fontSize:12,color:'#555'}}>💳 Reste à payer par carte</div><div style={{fontSize:28,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div></>
+              }
             </div>
           )}
-          {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
-            <div style={{background:'rgba(46,125,50,0.1)',border:'1px solid rgba(46,125,50,0.3)',borderRadius:12,padding:12,marginBottom:16,textAlign:'center'}}>
-              <div style={{fontSize:12,color:'#555'}}>💳 Reste à payer par carte</div>
-              <div style={{fontSize:26,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
-            </div>
-          )}
-          <div style={{display:'flex',gap:6,marginBottom:16}}>
+          <div style={{display:'flex',gap:6,marginBottom:12}}>
             {[5,10,20,50].map(m=>(
-              <button key={m} style={{flex:1,padding:'8px 4px',borderRadius:10,border:`1px solid rgba(120,183,160,0.2)`,background:`rgba(120,183,160,0.08)`,color:C2,fontWeight:700,fontSize:13,cursor:'pointer'}}
+              <button key={m} style={{flex:1,padding:'8px 4px',borderRadius:10,border:'1px solid rgba(120,183,160,0.2)',background:'rgba(120,183,160,0.08)',color:C2,fontWeight:700,fontSize:13,cursor:'pointer'}}
                 onClick={()=>setMontantDonne(String(m))}>{m}€</button>
             ))}
           </div>
@@ -1759,7 +1759,7 @@ export default function App() {
                 setMontantDonne('');
               }}>
               {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
-                ? '✅ '+fmt(parseFloat(montantDonne))+' espèces + '+fmt(finalTotal-parseFloat(montantDonne))+' carte'
+                ? '✅ '+fmt(parseFloat(montantDonne))+' esp + '+fmt(finalTotal-parseFloat(montantDonne))+' carte'
                 : '✅ Valider'}
             </button>
           </div>
