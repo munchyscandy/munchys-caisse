@@ -511,21 +511,20 @@ export default function App() {
 
   const holdTicket = () => {
     if(!cart.length){ alert('Panier vide !'); return; }
-    const nom = prompt('Nom ou note pour ce ticket (optionnel) :') || '';
+    const nom = prompt('Nom du client (optionnel) :') || '';
+    const tel = prompt('Téléphone (optionnel) :') || '';
+    const time = new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'});
     const ticket = {
       id: Date.now(),
       cart: [...cart],
-      client,
-      useCagnotte,
-      discount,
-      discountType,
-      label: nom || `Ticket ${new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}`,
-      time: new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})
+      client, useCagnotte, discount, discountType,
+      label: nom || ('Ticket '+time),
+      tel, time
     };
     setPendingTickets(prev=>[...prev, ticket]);
     setCart([]); setClient(null); setUseCagnotte(false); setDiscount(0);
     setDiscountInput(''); setSearch('');
-    alert(`✅ Ticket mis en attente : "${ticket.label}"`);
+    alert('✅ Ticket mis en attente'+(nom?' : '+nom:'')+(tel?' ('+tel+')':''));
   };
 
   const recallTicket = (ticket) => {
@@ -1725,18 +1724,18 @@ export default function App() {
       {modal==='cash'&&(
         <div style={S.overlay}><div style={S.modal}>
           <h2 style={S.mTitle}>💵 Paiement espèces</h2>
-          <div style={{fontSize:36,fontWeight:900,textAlign:'center',color:'#111',marginBottom:4,letterSpacing:'-1px'}}>{fmt(finalTotal)}</div>
+          <div style={{fontSize:36,fontWeight:900,textAlign:'center',color:'#111',marginBottom:4}}>{fmt(finalTotal)}</div>
           <p style={{color:'#555',fontSize:12,textAlign:'center',marginBottom:14}}>Total à payer</p>
           <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💵 Montant donné en espèces</label>
           <input style={{...S.eInput,fontSize:28,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
             type="number" step="0.01" min="0" placeholder="0,00" value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
           {montantDonne&&parseFloat(montantDonne)>0&&(
             <div style={{borderRadius:12,padding:'12px',marginBottom:12,textAlign:'center',
-              background:parseFloat(montantDonne)>=finalTotal?'rgba(46,125,50,0.1)':'rgba(120,183,160,0.1)',
-              border:'1px solid rgba(120,183,160,0.3)'}}>
+              background:parseFloat(montantDonne)>=finalTotal?'rgba(46,125,50,0.1)':'rgba(211,81,139,0.1)',
+              border:`1px solid ${parseFloat(montantDonne)>=finalTotal?'rgba(46,125,50,0.3)':'rgba(211,81,139,0.3)'}`}}>
               {parseFloat(montantDonne)>=finalTotal
-                ? <><div style={{fontSize:12,color:'#555'}}>Monnaie à rendre</div><div style={{fontSize:32,fontWeight:900,color:C2}}>{fmt(parseFloat(montantDonne)-finalTotal)}</div></>
-                : <><div style={{fontSize:12,color:'#555'}}>💳 Reste à payer par carte</div><div style={{fontSize:28,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div></>
+                ?<><div style={{fontSize:12,color:'#555'}}>Monnaie à rendre</div><div style={{fontSize:32,fontWeight:900,color:C2}}>{fmt(parseFloat(montantDonne)-finalTotal)}</div></>
+                :<><div style={{fontSize:13,color:'#D3518B',fontWeight:700}}>💰 Reste à payer</div><div style={{fontSize:32,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div></>
               }
             </div>
           )}
@@ -1748,20 +1747,12 @@ export default function App() {
           </div>
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
-            <button style={S.btnConfirm}
-              onClick={async()=>{
-                const donne = parseFloat(String(montantDonne).replace(',','.'));
-                if(donne>0&&donne<finalTotal){
-                  await handlePayment('mixte espèces+carte (espèces: '+donne.toFixed(2)+'€, carte: '+(finalTotal-donne).toFixed(2)+'€)');
-                } else {
-                  await handlePayment('espèces');
-                }
-                setMontantDonne('');
-              }}>
-              {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
-                ? '✅ '+fmt(parseFloat(montantDonne))+' esp + '+fmt(finalTotal-parseFloat(montantDonne))+' carte'
-                : '✅ Valider'}
-            </button>
+            {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
+              ? <button style={S.btnConfirm} onClick={()=>{setSplitPaid(parseFloat(montantDonne));setSplitMethod('espèces');setModal('splitReste');setMontantDonne('');}}>
+                  Continuer → Reste {fmt(finalTotal-parseFloat(montantDonne))}
+                </button>
+              : <button style={S.btnConfirm} onClick={()=>{handlePayment('espèces');setMontantDonne('');}}>✅ Valider</button>
+            }
           </div>
         </div></div>
       )}
@@ -1778,28 +1769,19 @@ export default function App() {
             value={montantDonne||''} onChange={e=>setMontantDonne(e.target.value)}
             placeholder={finalTotal.toFixed(2)} autoFocus/>
           {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
-            <div style={{background:'rgba(46,125,50,0.1)',border:'1px solid rgba(46,125,50,0.3)',borderRadius:10,padding:'10px',marginBottom:12,textAlign:'center'}}>
-              <div style={{fontSize:12,color:'#555'}}>💵 Reste à payer en espèces</div>
-              <div style={{fontSize:28,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
+            <div style={{background:'rgba(211,81,139,0.1)',border:'1px solid rgba(211,81,139,0.3)',borderRadius:10,padding:'10px',marginBottom:12,textAlign:'center'}}>
+              <div style={{fontSize:13,color:'#D3518B',fontWeight:700}}>💰 Reste à payer</div>
+              <div style={{fontSize:32,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
             </div>
           )}
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
-            <button style={S.btnConfirm}
-              disabled={montantDonne!==''&&montantDonne!==undefined&&parseFloat(montantDonne)<=0}
-              onClick={async()=>{
-                const montant = parseFloat(montantDonne)||finalTotal;
-                if(montant<finalTotal){
-                  await handlePayment('mixte carte+espèces (carte: '+montant.toFixed(2)+'€)');
-                } else {
-                  await handlePayment('carte');
-                }
-                setMontantDonne('');
-              }}>
-              {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
-                ? `✅ ${fmt(parseFloat(montantDonne))} carte + ${fmt(finalTotal-parseFloat(montantDonne))} espèces`
-                : 'Paiement reçu ✓'}
-            </button>
+            {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
+              ? <button style={S.btnConfirm} onClick={()=>{setSplitPaid(parseFloat(montantDonne));setSplitMethod('carte');setModal('splitReste');setMontantDonne('');}}>
+                  Continuer → Reste {fmt(finalTotal-parseFloat(montantDonne))}
+                </button>
+              : <button style={S.btnConfirm} onClick={()=>{handlePayment('carte');setMontantDonne('');}}>Paiement reçu ✓</button>
+            }
           </div>
         </div></div>
       )}
@@ -2087,7 +2069,9 @@ export default function App() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                       <div>
                         <div style={{fontWeight:800,fontSize:14,color:'#111'}}>📋 {t.label}</div>
+                        {t.tel&&<div style={{fontSize:12,color:'#D3518B',fontWeight:700}}>📞 {t.tel}</div>}
                         <div style={{fontSize:12,color:'#888'}}>{t.cart.map(i=>i.nom+' x'+i.qty).join(', ')}</div>
+                        <div style={{fontSize:11,color:'#aaa'}}>⏰ {t.time}</div>
                       </div>
                       <div style={{textAlign:'right'}}>
                         <div style={{fontWeight:900,fontSize:18,color:'#D3518B'}}>{total.toFixed(2)}€</div>
@@ -2101,6 +2085,36 @@ export default function App() {
             <button style={S.btnCancel} onClick={()=>setShowPending(false)}>Fermer</button>
           </div>
         </div>
+      )}
+      {/* PAIEMENT MIXTE - RESTE A PAYER */}
+      {modal==='splitReste'&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>💰 Reste à payer</h2>
+          <div style={{background:'rgba(211,81,139,0.08)',borderRadius:12,padding:'14px',marginBottom:16,textAlign:'center'}}>
+            <div style={{fontSize:12,color:'#555',marginBottom:4}}>{splitMethod==='carte'?'💳 Carte encaissée':'💵 Espèces encaissées'}</div>
+            <div style={{fontSize:18,color:'#888',marginBottom:8}}>-{fmt(splitPaid)}</div>
+            <div style={{borderTop:'1px solid rgba(211,81,139,0.2)',paddingTop:10}}>
+              <div style={{fontSize:13,color:'#D3518B',fontWeight:700,marginBottom:4}}>💰 Reste à payer</div>
+              <div style={{fontSize:36,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-splitPaid)}</div>
+            </div>
+          </div>
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16,fontWeight:700}}>Comment payer le reste ?</p>
+          <div style={{display:'flex',gap:10,marginBottom:8}}>
+            {splitMethod!=='carte'&&(
+              <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px',fontSize:14}} onClick={async()=>{
+                await handlePayment('mixte '+splitMethod+'+carte ('+splitMethod+': '+splitPaid.toFixed(2)+'€, carte: '+(finalTotal-splitPaid).toFixed(2)+'€)');
+                setSplitPaid(0);setSplitMethod(null);
+              }}>💳 Carte<br/>{fmt(finalTotal-splitPaid)}</button>
+            )}
+            {splitMethod!=='espèces'&&(
+              <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px',fontSize:14}} onClick={async()=>{
+                await handlePayment('mixte '+splitMethod+'+espèces ('+splitMethod+': '+splitPaid.toFixed(2)+'€, espèces: '+(finalTotal-splitPaid).toFixed(2)+'€)');
+                setSplitPaid(0);setSplitMethod(null);
+              }}>💵 Espèces<br/>{fmt(finalTotal-splitPaid)}</button>
+            )}
+          </div>
+          <button style={S.btnCancel} onClick={()=>{setModal(null);setSplitPaid(0);setSplitMethod(null);}}>Annuler</button>
+        </div></div>
       )}
       {/* PAIEMENT MIXTE */}
       {modal==='splitStart'&&(
