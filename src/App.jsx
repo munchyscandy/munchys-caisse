@@ -1750,16 +1750,16 @@ export default function App() {
             <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
             <button style={S.btnConfirm}
               onClick={async()=>{
-                const donne = parseFloat(montantDonne)||0;
+                const donne = parseFloat(String(montantDonne).replace(',','.'));
                 if(donne>0&&donne<finalTotal){
-                  await handlePayment('mixte espèces+carte (espèces: '+donne.toFixed(2)+'€)');
+                  await handlePayment('mixte espèces+carte (espèces: '+donne.toFixed(2)+'€, carte: '+(finalTotal-donne).toFixed(2)+'€)');
                 } else {
                   await handlePayment('espèces');
                 }
                 setMontantDonne('');
               }}>
               {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
-                ? `✅ ${fmt(parseFloat(montantDonne))} espèces + ${fmt(finalTotal-parseFloat(montantDonne))} carte`
+                ? '✅ '+fmt(parseFloat(montantDonne))+' espèces + '+fmt(finalTotal-parseFloat(montantDonne))+' carte'
                 : '✅ Valider'}
             </button>
           </div>
