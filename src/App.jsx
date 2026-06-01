@@ -1734,9 +1734,10 @@ export default function App() {
               <div style={{fontSize:38,fontWeight:900,color:C2,letterSpacing:'-1px'}}>{fmt(parseFloat(montantDonne)-finalTotal)}</div>
             </div>
           )}
-          {montantDonne&&parseFloat(montantDonne)<finalTotal&&(
-            <div style={{background:'rgba(255,50,50,0.1)',border:'1px solid rgba(255,50,50,0.2)',borderRadius:12,padding:12,marginBottom:16,textAlign:'center',color:'#ff6b6b',fontSize:13,fontWeight:700}}>
-              ⚠️ Insuffisant — manque {fmt(finalTotal-parseFloat(montantDonne))}
+          {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
+            <div style={{background:'rgba(46,125,50,0.1)',border:'1px solid rgba(46,125,50,0.3)',borderRadius:12,padding:12,marginBottom:16,textAlign:'center'}}>
+              <div style={{fontSize:12,color:'#555'}}>💳 Reste à payer par carte</div>
+              <div style={{fontSize:26,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
             </div>
           )}
           <div style={{display:'flex',gap:6,marginBottom:16}}>
@@ -1747,9 +1748,20 @@ export default function App() {
           </div>
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
-            <button style={{...S.btnConfirm,opacity:montantDonne&&parseFloat(montantDonne)<finalTotal?0.5:1}}
-              disabled={montantDonne&&parseFloat(montantDonne)<finalTotal}
-              onClick={()=>{handlePayment('espèces');setMontantDonne('');}}>✅ Valider</button>
+            <button style={S.btnConfirm}
+              onClick={async()=>{
+                const donne = parseFloat(montantDonne)||0;
+                if(donne>0&&donne<finalTotal){
+                  await handlePayment('mixte espèces+carte (espèces: '+donne.toFixed(2)+'€)');
+                } else {
+                  await handlePayment('espèces');
+                }
+                setMontantDonne('');
+              }}>
+              {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
+                ? `✅ ${fmt(parseFloat(montantDonne))} espèces + ${fmt(finalTotal-parseFloat(montantDonne))} carte`
+                : '✅ Valider'}
+            </button>
           </div>
         </div></div>
       )}
@@ -1758,11 +1770,36 @@ export default function App() {
       {modal==='payment'&&(
         <div style={S.overlay}><div style={S.modal}>
           <h2 style={S.mTitle}>💳 Paiement carte</h2>
-          <div style={{fontSize:44,fontWeight:900,color:C1,textAlign:'center',margin:'18px 0'}}>{fmt(finalTotal)}</div>
-          <p style={{color:'#888',fontSize:13,textAlign:'center',marginBottom:20}}>Présentez le terminal myPOS Go 2</p>
+          <div style={{fontSize:36,fontWeight:900,color:C1,textAlign:'center',marginBottom:4}}>{fmt(finalTotal)}</div>
+          <p style={{color:'#888',fontSize:12,textAlign:'center',marginBottom:14}}>Total à payer</p>
+          <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💳 Montant payé par carte</label>
+          <input style={{...S.eInput,fontSize:28,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
+            type="number" step="0.01" min="0"
+            value={montantDonne||''} onChange={e=>setMontantDonne(e.target.value)}
+            placeholder={finalTotal.toFixed(2)} autoFocus/>
+          {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
+            <div style={{background:'rgba(46,125,50,0.1)',border:'1px solid rgba(46,125,50,0.3)',borderRadius:10,padding:'10px',marginBottom:12,textAlign:'center'}}>
+              <div style={{fontSize:12,color:'#555'}}>💵 Reste à payer en espèces</div>
+              <div style={{fontSize:28,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
+            </div>
+          )}
           <div style={S.mBtns}>
-            <button style={S.btnCancel} onClick={()=>setModal(null)}>Annuler</button>
-            <button style={S.btnConfirm} onClick={()=>handlePayment('carte')}>Paiement reçu ✓</button>
+            <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
+            <button style={S.btnConfirm}
+              disabled={montantDonne!==''&&montantDonne!==undefined&&parseFloat(montantDonne)<=0}
+              onClick={async()=>{
+                const montant = parseFloat(montantDonne)||finalTotal;
+                if(montant<finalTotal){
+                  await handlePayment('mixte carte+espèces (carte: '+montant.toFixed(2)+'€)');
+                } else {
+                  await handlePayment('carte');
+                }
+                setMontantDonne('');
+              }}>
+              {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal
+                ? `✅ ${fmt(parseFloat(montantDonne))} carte + ${fmt(finalTotal-parseFloat(montantDonne))} espèces`
+                : 'Paiement reçu ✓'}
+            </button>
           </div>
         </div></div>
       )}
@@ -2091,12 +2128,12 @@ export default function App() {
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
             <button style={S.btnConfirm}
-              disabled={!montantDonne||parseFloat(montantDonne)<=0||parseFloat(montantDonne)>=finalTotal}
+              disabled={!montantDonne||isNaN(parseFloat(montantDonne))||parseFloat(montantDonne)<=0}
               onClick={async()=>{
                 await handlePayment('mixte carte+espèces (carte: '+parseFloat(montantDonne).toFixed(2)+'€)');
                 setSplitPaid(0); setSplitMethod(null); setMontantDonne('');
               }}>
-              ✅ Valider ({fmt(parseFloat(montantDonne)||0)} carte + {fmt(finalTotal-(parseFloat(montantDonne)||0))} espèces)
+              ✅ Valider ({fmt(parseFloat(montantDonne)||0)} carte + {fmt(Math.max(0,finalTotal-(parseFloat(montantDonne)||0)))} espèces)
             </button>
           </div>
         </div></div>
