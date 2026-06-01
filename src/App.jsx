@@ -51,6 +51,10 @@ export default function App() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [testMode, setTestMode] = useState(false);
   const [montantDonne, setMontantDonne] = useState('');
+  const [splitPaid, setSplitPaid] = useState(0); // montant déjà payé (paiement mixte)
+  const [splitMethod, setSplitMethod] = useState(null); // 'carte' ou 'espèces'
+  const [pendingTickets, setPendingTickets] = useState([]); // tickets en attente
+  const [showPending, setShowPending] = useState(false);
   const [testVentes, setTestVentes] = useState([]);
   const [exportDateFrom, setExportDateFrom] = useState(new Date().toISOString().split('T')[0].slice(0,7)+'-01');
   const [showExportModal, setShowExportModal] = useState(false);
@@ -58,6 +62,8 @@ export default function App() {
   const [exportDetailLevel, setExportDetailLevel] = useState('global'); // global, detail, client
   const [exportFormat, setExportFormat] = useState('pdf'); // pdf, csv, both
   const [exportDateTo, setExportDateTo] = useState(new Date().toISOString().split('T')[0]);
+  const [exportMonth, setExportMonth] = useState(new Date().toISOString().slice(0,7)); // YYYY-MM
+  const [exportQuarter, setExportQuarter] = useState(`${new Date().getFullYear()}-Q${Math.floor(new Date().getMonth()/3)+1}`);
   const [pinInput, setPinInput] = useState('');
   const [pinUnlocked, setPinUnlocked] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -467,6 +473,13 @@ export default function App() {
     setDiscount(v);setModal(null);
   };
 
+  const handleSplitPayment = async (firstMethod, firstAmount) => {
+    setSplitPaid(firstAmount);
+    setSplitMethod(firstMethod);
+    setModal('split');
+    setMontantDonne('');
+  };
+
   const handlePayment = async (method) => {
     if(client&&!testMode){
       const newCag=cagnotte-cagnotteUsed+cashback;
@@ -496,9 +509,40 @@ export default function App() {
     setModal('receipt');
   };
 
+  const holdTicket = () => {
+    if(!cart.length){ alert('Panier vide !'); return; }
+    const nom = prompt('Nom ou note pour ce ticket (optionnel) :') || '';
+    const ticket = {
+      id: Date.now(),
+      cart: [...cart],
+      client,
+      useCagnotte,
+      discount,
+      discountType,
+      label: nom || `Ticket ${new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}`,
+      time: new Date().toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})
+    };
+    setPendingTickets(prev=>[...prev, ticket]);
+    setCart([]); setClient(null); setUseCagnotte(false); setDiscount(0);
+    setDiscountInput(''); setSearch('');
+    alert(`✅ Ticket mis en attente : "${ticket.label}"`);
+  };
+
+  const recallTicket = (ticket) => {
+    if(cart.length > 0 && !confirm('Remplacer le panier actuel par ce ticket ?')) return;
+    setCart(ticket.cart);
+    setClient(ticket.client);
+    setUseCagnotte(ticket.useCagnotte);
+    setDiscount(ticket.discount);
+    setDiscountType(ticket.discountType);
+    setPendingTickets(prev=>prev.filter(t=>t.id!==ticket.id));
+    setShowPending(false);
+  };
+
   const newSale = () => {
     setCart([]);setClient(null);setUseCagnotte(false);setDiscount(0);
     setDiscountInput('');setModal(null);setReceipt(null);setSearch('');
+    setSplitPaid(0); setSplitMethod(null);
   };
 
   const startBarcodeScanner = () => setShowBarcodeScanner(true);
@@ -1265,9 +1309,14 @@ export default function App() {
               <button style={{...S.payBtn,...S.payCard,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('payment')} disabled={!cart.length}>💳 CARTE</button>
               <button style={{...S.payBtn,...S.payCash,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('cash')} disabled={!cart.length}>💵 ESPÈCES</button>
             </div>
+            <button style={{width:'100%',padding:'6px',borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer',display:cart.length>0?'block':'none'}} onClick={()=>cart.length>0&&setModal('splitStart')}>💳+💵 Paiement mixte</button>
             <div style={{display:'flex',gap:5}}>
               <button style={{...S.remiseBtn,padding:'7px 6px',fontSize:11}} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
               {discount>0&&<button style={{...S.clearRemise,padding:'7px 8px',fontSize:11}} onClick={()=>setDiscount(0)}>✕</button>}
+              <button style={{...S.clearBtn,padding:'7px 8px',fontSize:11,flexShrink:0,background:'rgba(255,165,0,0.2)',border:'1px solid rgba(255,165,0,0.4)'}} onClick={holdTicket}>⏸️</button>
+              {pendingTickets.length>0&&<button style={{...S.clearBtn,padding:'7px 8px',fontSize:11,flexShrink:0,background:'rgba(120,183,160,0.3)',border:'1px solid rgba(120,183,160,0.5)',position:'relative'}} onClick={()=>setShowPending(true)}>
+                📋<span style={{position:'absolute',top:-4,right:-4,background:'#D3518B',color:'#fff',borderRadius:'50%',width:16,height:16,fontSize:9,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:900}}>{pendingTickets.length}</span>
+              </button>}
               <button style={{...S.clearBtn,padding:'7px 10px',fontSize:13,flexShrink:0}} onClick={newSale}>🗑️</button>
             </div>
           </div>
@@ -1987,6 +2036,105 @@ export default function App() {
 
       {/* Douchette: géré via searchRef ci-dessus */}
 
+      {/* TICKETS EN ATTENTE */}
+      {showPending&&(
+        <div style={S.overlay}>
+          <div style={{...S.modal,width:460,maxHeight:'80vh',overflowY:'auto'}}>
+            <h2 style={S.mTitle}>📋 Tickets en attente ({pendingTickets.length})</h2>
+            {!pendingTickets.length&&<p style={{textAlign:'center',color:'#888'}}>Aucun ticket en attente</p>}
+            <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+              {pendingTickets.map(t=>{
+                const total = t.cart.reduce((s,i)=>s+i.prix*i.qty,0);
+                return(
+                  <div key={t.id} style={{padding:'12px 14px',borderRadius:10,border:'1px solid #e0e0e0',background:'#fafafa'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <div>
+                        <div style={{fontWeight:800,fontSize:14,color:'#111'}}>📋 {t.label}</div>
+                        <div style={{fontSize:12,color:'#888'}}>{t.cart.map(i=>i.nom+' x'+i.qty).join(', ')}</div>
+                      </div>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontWeight:900,fontSize:18,color:'#D3518B'}}>{total.toFixed(2)}€</div>
+                        <button style={{...S.btnConfirm,padding:'6px 14px',fontSize:12,marginTop:4}} onClick={()=>recallTicket(t)}>Rappeler</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button style={S.btnCancel} onClick={()=>setShowPending(false)}>Fermer</button>
+          </div>
+        </div>
+      )}
+      {/* PAIEMENT MIXTE - ETAPE 1 */}
+      {modal==='splitStart'&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>💳+💵 Paiement mixte</h2>
+          <div style={{fontSize:32,fontWeight:900,textAlign:'center',color:'#D3518B',marginBottom:16}}>{fmt(finalTotal)}</div>
+          <p style={{color:'#888',fontSize:13,textAlign:'center',marginBottom:16}}>Quel est le premier mode de paiement ?</p>
+          <div style={{display:'flex',gap:10,marginBottom:16}}>
+            <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px'}} onClick={()=>{setSplitMethod('carte');setModal('splitAmount');}}>💳 Carte en premier</button>
+            <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px'}} onClick={()=>{setSplitMethod('espèces');setModal('splitAmount');}}>💵 Espèces en premier</button>
+          </div>
+          <button style={S.btnCancel} onClick={()=>setModal(null)}>Annuler</button>
+        </div></div>
+      )}
+      {/* PAIEMENT MIXTE - ETAPE 2: saisie montant */}
+      {modal==='splitAmount'&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>{splitMethod==='carte'?'💳 Carte':'💵 Espèces'} — Montant</h2>
+          <div style={{fontSize:18,textAlign:'center',color:'#888',marginBottom:8}}>Total: {fmt(finalTotal)}</div>
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16}}>Combien paie-t-il par {splitMethod==='carte'?'carte':'espèces'} ?</p>
+          <input style={{...S.eInput,fontSize:32,textAlign:'center',fontWeight:900,padding:'14px',marginBottom:16}}
+            type="number" step="0.01" min="0" max={finalTotal} placeholder="0,00"
+            value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
+          {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
+            <div style={{background:'#e8f5e9',borderRadius:10,padding:'10px 14px',marginBottom:16,textAlign:'center'}}>
+              <div style={{fontSize:13,color:'#555'}}>Reste à payer</div>
+              <div style={{fontSize:28,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
+              <div style={{fontSize:12,color:'#888'}}>par {splitMethod==='carte'?'espèces':'carte'}</div>
+            </div>
+          )}
+          <div style={S.mBtns}>
+            <button style={S.btnCancel} onClick={()=>setModal(null)}>Annuler</button>
+            <button style={S.btnConfirm} disabled={!montantDonne||parseFloat(montantDonne)<=0||parseFloat(montantDonne)>=finalTotal}
+              onClick={()=>{setSplitPaid(parseFloat(montantDonne));setModal('splitFinish');setMontantDonne('');}}>
+              Confirmer →
+            </button>
+          </div>
+        </div></div>
+      )}
+      {/* PAIEMENT MIXTE - ETAPE 3: reste à payer */}
+      {modal==='splitFinish'&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>✅ Reste à payer</h2>
+          <div style={{background:'rgba(211,81,139,0.1)',borderRadius:12,padding:'14px',marginBottom:16,textAlign:'center'}}>
+            <div style={{fontSize:13,color:'#555',marginBottom:4}}>{splitMethod==='carte'?'💳 Carte':'💵 Espèces'} encaissé</div>
+            <div style={{fontSize:22,fontWeight:900,color:'#555',marginBottom:8}}>-{fmt(splitPaid)}</div>
+            <div style={{borderTop:'1px solid rgba(211,81,139,0.2)',paddingTop:10}}>
+              <div style={{fontSize:13,color:'#555',marginBottom:4}}>💰 Reste à payer</div>
+              <div style={{fontSize:36,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-splitPaid)}</div>
+            </div>
+          </div>
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16}}>Mode de paiement pour le reste :</p>
+          {(finalTotal-splitPaid)>0&&(
+            <div style={{display:'flex',gap:10,marginBottom:8}}>
+              {splitMethod==='carte'&&(
+                <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px'}} onClick={async()=>{
+                  await handlePayment('mixte carte+espèces');
+                  setSplitPaid(0); setSplitMethod(null);
+                }}>💵 Espèces ({fmt(finalTotal-splitPaid)})</button>
+              )}
+              {splitMethod==='espèces'&&(
+                <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px'}} onClick={async()=>{
+                  await handlePayment('mixte espèces+carte');
+                  setSplitPaid(0); setSplitMethod(null);
+                }}>💳 Carte ({fmt(finalTotal-splitPaid)})</button>
+              )}
+            </div>
+          )}
+          <button style={S.btnCancel} onClick={()=>{setModal(null);setSplitPaid(0);setSplitMethod(null);}}>Annuler</button>
+        </div></div>
+      )}
       {/* EXPORT MODAL */}
       {showExportModal&&(
         <div style={S.overlay}>
@@ -2003,6 +2151,26 @@ export default function App() {
                   </label>
                 ))}
               </div>
+              {exportPeriodType==='monthly'&&(
+                <div style={{display:'flex',gap:8,alignItems:'center',marginTop:10}}>
+                  <span style={{fontSize:12,color:'#555'}}>Mois :</span>
+                  <input type="month" style={{...S.eInput,flex:1,padding:'6px 10px'}} value={exportMonth} onChange={e=>setExportMonth(e.target.value)}/>
+                </div>
+              )}
+              {exportPeriodType==='quarterly'&&(
+                <div style={{display:'flex',gap:8,alignItems:'center',marginTop:10,flexWrap:'wrap'}}>
+                  <span style={{fontSize:12,color:'#555'}}>Trimestre :</span>
+                  {['Q1','Q2','Q3','Q4'].map(q=>{
+                    const y = new Date().getFullYear();
+                    const val = `${y}-${q}`;
+                    return (
+                      <label key={q} style={{display:'flex',alignItems:'center',gap:4,padding:'6px 10px',borderRadius:8,border:`2px solid ${exportQuarter===val?'#D3518B':'#ddd'}`,cursor:'pointer',background:exportQuarter===val?'#fff0f6':'#fafafa',fontSize:13}}>
+                        <input type="radio" checked={exportQuarter===val} onChange={()=>setExportQuarter(val)} style={{accentColor:'#D3518B'}}/>{q} {y}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
               {exportPeriodType==='custom'&&(
                 <div style={{display:'flex',gap:8,alignItems:'center',marginTop:10}}>
                   <span style={{fontSize:12,color:'#555'}}>Du</span>
