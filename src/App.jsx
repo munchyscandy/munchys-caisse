@@ -2065,74 +2065,40 @@ export default function App() {
           </div>
         </div>
       )}
-      {/* PAIEMENT MIXTE - ETAPE 1 */}
+      {/* PAIEMENT MIXTE */}
       {modal==='splitStart'&&(
         <div style={S.overlay}><div style={S.modal}>
           <h2 style={S.mTitle}>💳+💵 Paiement mixte</h2>
-          <div style={{fontSize:32,fontWeight:900,textAlign:'center',color:'#D3518B',marginBottom:16}}>{fmt(finalTotal)}</div>
-          <p style={{color:'#888',fontSize:13,textAlign:'center',marginBottom:16}}>Quel est le premier mode de paiement ?</p>
-          <div style={{display:'flex',gap:10,marginBottom:16}}>
-            <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px'}} onClick={()=>{setSplitMethod('carte');setModal('splitAmount');}}>💳 Carte en premier</button>
-            <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px'}} onClick={()=>{setSplitMethod('espèces');setModal('splitAmount');}}>💵 Espèces en premier</button>
-          </div>
-          <button style={S.btnCancel} onClick={()=>setModal(null)}>Annuler</button>
-        </div></div>
-      )}
-      {/* PAIEMENT MIXTE - ETAPE 2: saisie montant */}
-      {modal==='splitAmount'&&(
-        <div style={S.overlay}><div style={S.modal}>
-          <h2 style={S.mTitle}>{splitMethod==='carte'?'💳 Carte':'💵 Espèces'} — Montant</h2>
-          <div style={{fontSize:18,textAlign:'center',color:'#888',marginBottom:8}}>Total: {fmt(finalTotal)}</div>
-          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16}}>Combien paie-t-il par {splitMethod==='carte'?'carte':'espèces'} ?</p>
-          <input style={{...S.eInput,fontSize:32,textAlign:'center',fontWeight:900,padding:'14px',marginBottom:16}}
-            type="number" step="0.01" min="0" max={finalTotal} placeholder="0,00"
+          <div style={{fontSize:32,fontWeight:900,textAlign:'center',color:'#D3518B',marginBottom:4}}>{fmt(finalTotal)}</div>
+          <p style={{color:'#888',fontSize:12,textAlign:'center',marginBottom:16}}>Total à payer</p>
+          <label style={{fontSize:13,color:'#555',fontWeight:700,display:'block',marginBottom:8}}>💳 Montant payé par carte</label>
+          <input style={{...S.eInput,fontSize:28,textAlign:'center',fontWeight:900,padding:'12px',marginBottom:12}}
+            type="number" step="0.01" min="0" placeholder="0,00"
             value={montantDonne} onChange={e=>setMontantDonne(e.target.value)} autoFocus/>
-          {montantDonne&&parseFloat(montantDonne)>0&&parseFloat(montantDonne)<finalTotal&&(
-            <div style={{background:'#e8f5e9',borderRadius:10,padding:'10px 14px',marginBottom:16,textAlign:'center'}}>
-              <div style={{fontSize:13,color:'#555'}}>Reste à payer</div>
-              <div style={{fontSize:28,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
-              <div style={{fontSize:12,color:'#888'}}>par {splitMethod==='carte'?'espèces':'carte'}</div>
+          {montantDonne&&parseFloat(montantDonne)>0&&(
+            <div style={{borderRadius:12,padding:'12px 16px',marginBottom:16,textAlign:'center',
+              background:parseFloat(montantDonne)>=finalTotal?'rgba(255,100,0,0.1)':'rgba(46,125,50,0.1)',
+              border:`1px solid ${parseFloat(montantDonne)>=finalTotal?'rgba(255,100,0,0.3)':'rgba(46,125,50,0.3)'}`}}>
+              {parseFloat(montantDonne)>=finalTotal
+                ? <span style={{color:'#b35000',fontWeight:700}}>⚠️ Montant trop élevé — utilise le paiement carte normal</span>
+                : <>
+                    <div style={{fontSize:13,color:'#555'}}>💵 Reste à payer en espèces</div>
+                    <div style={{fontSize:36,fontWeight:900,color:'#2e7d32'}}>{fmt(finalTotal-parseFloat(montantDonne))}</div>
+                  </>
+              }
             </div>
           )}
           <div style={S.mBtns}>
-            <button style={S.btnCancel} onClick={()=>setModal(null)}>Annuler</button>
-            <button style={S.btnConfirm} disabled={!montantDonne||parseFloat(montantDonne)<=0||parseFloat(montantDonne)>=finalTotal}
-              onClick={()=>{setSplitPaid(parseFloat(montantDonne));setModal('splitFinish');setMontantDonne('');}}>
-              Confirmer →
+            <button style={S.btnCancel} onClick={()=>{setModal(null);setMontantDonne('');}}>Annuler</button>
+            <button style={S.btnConfirm}
+              disabled={!montantDonne||parseFloat(montantDonne)<=0||parseFloat(montantDonne)>=finalTotal}
+              onClick={async()=>{
+                await handlePayment('mixte carte+espèces (carte: '+parseFloat(montantDonne).toFixed(2)+'€)');
+                setSplitPaid(0); setSplitMethod(null); setMontantDonne('');
+              }}>
+              ✅ Valider ({fmt(parseFloat(montantDonne)||0)} carte + {fmt(finalTotal-(parseFloat(montantDonne)||0))} espèces)
             </button>
           </div>
-        </div></div>
-      )}
-      {/* PAIEMENT MIXTE - ETAPE 3: reste à payer */}
-      {modal==='splitFinish'&&(
-        <div style={S.overlay}><div style={S.modal}>
-          <h2 style={S.mTitle}>✅ Reste à payer</h2>
-          <div style={{background:'rgba(211,81,139,0.1)',borderRadius:12,padding:'14px',marginBottom:16,textAlign:'center'}}>
-            <div style={{fontSize:13,color:'#555',marginBottom:4}}>{splitMethod==='carte'?'💳 Carte':'💵 Espèces'} encaissé</div>
-            <div style={{fontSize:22,fontWeight:900,color:'#555',marginBottom:8}}>-{fmt(splitPaid)}</div>
-            <div style={{borderTop:'1px solid rgba(211,81,139,0.2)',paddingTop:10}}>
-              <div style={{fontSize:13,color:'#555',marginBottom:4}}>💰 Reste à payer</div>
-              <div style={{fontSize:36,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-splitPaid)}</div>
-            </div>
-          </div>
-          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16}}>Mode de paiement pour le reste :</p>
-          {(finalTotal-splitPaid)>0&&(
-            <div style={{display:'flex',gap:10,marginBottom:8}}>
-              {splitMethod==='carte'&&(
-                <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px'}} onClick={async()=>{
-                  await handlePayment('mixte carte+espèces');
-                  setSplitPaid(0); setSplitMethod(null);
-                }}>💵 Espèces ({fmt(finalTotal-splitPaid)})</button>
-              )}
-              {splitMethod==='espèces'&&(
-                <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px'}} onClick={async()=>{
-                  await handlePayment('mixte espèces+carte');
-                  setSplitPaid(0); setSplitMethod(null);
-                }}>💳 Carte ({fmt(finalTotal-splitPaid)})</button>
-              )}
-            </div>
-          )}
-          <button style={S.btnCancel} onClick={()=>{setModal(null);setSplitPaid(0);setSplitMethod(null);}}>Annuler</button>
         </div></div>
       )}
       {/* EXPORT MODAL */}
