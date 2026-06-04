@@ -837,6 +837,19 @@ export default function App() {
       });
     }
 
+    // Build quarterly section separately to avoid triple-nested template literals
+    const quarterlyHTML = displayMode==='quarterly' ? (
+      '<h2>Récapitulatif par mois</h2>' +
+      '<table><tr><th>Mois</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>' +
+      Object.entries(parMois).map(([mois,d]) =>
+        '<tr><td>' + new Date(mois+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'}) + '</td>' +
+        '<td>' + d.nb + '</td>' +
+        '<td class="right">' + d.esp.toFixed(2) + '€</td>' +
+        '<td class="right">' + d.carte.toFixed(2) + '€</td>' +
+        '<td class="right"><b>' + (d.esp+d.carte).toFixed(2) + '€</b></td></tr>'
+      ).join('') +
+      '<tr class="total-row"><td colspan="2">TOTAL</td><td class="right">' + totalEsp.toFixed(2) + '€</td><td class="right">' + totalCarte.toFixed(2) + '€</td><td class="right">' + totalTTC.toFixed(2) + '€</td></tr></table>'
+    ) : '';
     const w = window.open('about:blank','_blank');
     w.document.write(`<html><head><title>Export ${label}</title>
     <style>
@@ -910,20 +923,7 @@ export default function App() {
       <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
-    ${displayMode==='quarterly' ? `
-    <h2>Récapitulatif par mois</h2>
-    <table>
-      <tr><th>Mois</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
-      ${Object.entries(parMois).map(([mois,d])=>`
-        <tr>
-          <td>${new Date(mois+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</td>
-          <td>${d.nb}</td>
-          <td class="right">${d.esp.toFixed(2)}€</td>
-          <td class="right">${d.carte.toFixed(2)}€</td>
-          <td class="right"><b>${(d.esp+d.carte).toFixed(2)}€</b></td>
-        </tr>`).join('')}
-      <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
-    </table>` : ''}
+    ${quarterlyHTML}
     <p style="color:#888;font-size:10px;margin-top:30px">Munchy's Candy · Société Kalice TVA BE 0750.497.413 · Export comptable ${label}</p>
     <script>setTimeout(()=>window.print(),500);</script>
     </body></html>`);
@@ -1413,8 +1413,16 @@ export default function App() {
                   {testMode&&<span style={{background:'#ff9800',color:'#000',fontSize:10,fontWeight:900,padding:'2px 8px',borderRadius:6}}>🧪 TEST</span>}
                   <button style={{...S.editBtn,background:'rgba(120,183,160,0.15)',color:C2,fontSize:12,padding:'5px 10px'}}
                     onClick={()=>setShowExportModal(true)}>📥 Exporter</button>
-                  <span style={{fontSize:12,color:'#888'}}>💳 <b style={{color:C1}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='carte').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
-                  <span style={{fontSize:12,color:'#888'}}>💵 <b style={{color:C2}}>{displayVentes.filter(v=>!v.annulee&&v.paiement==='espèces').reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:12,color:'#888'}}>💳 <b style={{color:C1}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>{
+                    if(v.paiement==='carte') return s+parseFloat(v.total||0);
+                    const m=v.paiement&&v.paiement.match(/carte: ([\d.]+)/);
+                    return m?s+parseFloat(m[1]):s;
+                  },0).toFixed(2)}€</b></span>
+                  <span style={{fontSize:12,color:'#888'}}>💵 <b style={{color:C2}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>{
+                    if(v.paiement==='espèces') return s+parseFloat(v.total||0);
+                    const m=v.paiement&&v.paiement.match(/espèces: ([\d.]+)/);
+                    return m?s+parseFloat(m[1]):s;
+                  },0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>Total: <b style={{color:'#fff'}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                 </div>
                 <div style={S.settingsList}>
@@ -2098,22 +2106,35 @@ export default function App() {
               <div style={{fontSize:36,fontWeight:900,color:'#D3518B'}}>{fmt(finalTotal-splitPaid)}</div>
             </div>
           </div>
-          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16,fontWeight:700}}>Comment payer le reste ?</p>
-          <div style={{display:'flex',gap:10,marginBottom:8}}>
-            {splitMethod!=='carte'&&(
-              <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px',fontSize:14}} onClick={async()=>{
-                await handlePayment('mixte '+splitMethod+'+carte ('+splitMethod+': '+splitPaid.toFixed(2)+'€, carte: '+(finalTotal-splitPaid).toFixed(2)+'€)');
-                setSplitPaid(0);setSplitMethod(null);
-              }}>💳 Carte<br/>{fmt(finalTotal-splitPaid)}</button>
-            )}
-            {splitMethod!=='espèces'&&(
-              <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px',fontSize:14}} onClick={async()=>{
-                await handlePayment('mixte '+splitMethod+'+espèces ('+splitMethod+': '+splitPaid.toFixed(2)+'€, espèces: '+(finalTotal-splitPaid).toFixed(2)+'€)');
-                setSplitPaid(0);setSplitMethod(null);
-              }}>💵 Espèces<br/>{fmt(finalTotal-splitPaid)}</button>
-            )}
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:12,fontWeight:700}}>Comment payer le reste ?</p>
+          <div style={{display:'flex',gap:10,marginBottom:12}}>
+            <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→carte');setMontantDonne(fmt(finalTotal-splitPaid).replace(',','.'').replace('€','').trim());setModal('splitConfirm');}}>
+              💳 Carte<br/><b>{fmt(finalTotal-splitPaid)}</b>
+            </button>
+            <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→espèces');setMontantDonne(fmt(finalTotal-splitPaid).replace(',','.').replace('€','').trim());setModal('splitConfirm');}}>
+              💵 Espèces<br/><b>{fmt(finalTotal-splitPaid)}</b>
+            </button>
           </div>
-          <button style={S.btnCancel} onClick={()=>{setModal(null);setSplitPaid(0);setSplitMethod(null);}}>Annuler</button>
+          <button style={S.btnCancel} onClick={()=>{setModal(null);setSplitPaid(0);setSplitMethod(null);setMontantDonne('');}}>Annuler</button>
+        </div></div>
+      )}
+      {/* PAIEMENT MIXTE - CONFIRMATION SECOND PAIEMENT */}
+      {modal==='splitConfirm'&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>{splitMethod&&splitMethod.includes('carte')?'💳 Paiement carte':'💵 Paiement espèces'}</h2>
+          <div style={{fontSize:36,fontWeight:900,color:'#D3518B',textAlign:'center',marginBottom:8}}>{fmt(finalTotal-splitPaid)}</div>
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:20,fontWeight:700}}>
+            {splitMethod&&splitMethod.includes('→carte')?'Présentez le terminal carte':'Montant en espèces reçu ?'}
+          </p>
+          <div style={S.mBtns}>
+            <button style={S.btnCancel} onClick={()=>setModal('splitReste')}>← Retour</button>
+            <button style={S.btnConfirm} onClick={async()=>{
+              const second = splitMethod.includes('→carte')?'carte':'espèces';
+              const first = splitMethod.split('→')[0];
+              await handlePayment('mixte '+first+'+'+second+' ('+first+': '+splitPaid.toFixed(2)+'€, '+second+': '+(finalTotal-splitPaid).toFixed(2)+'€)');
+              setSplitPaid(0);setSplitMethod(null);setMontantDonne('');
+            }}>✅ Paiement reçu — {fmt(finalTotal-splitPaid)}</button>
+          </div>
         </div></div>
       )}
       {/* PAIEMENT MIXTE */}
