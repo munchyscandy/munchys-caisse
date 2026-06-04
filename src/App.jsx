@@ -910,19 +910,19 @@ export default function App() {
       <tr class="total-row"><td>TOTAL</td><td>${ok.length}</td><td class="right">${totalTTC.toFixed(2)}€</td><td></td></tr>
     </table>` : ''}
 
-    \${displayMode==='quarterly' ? `
+    ${displayMode==='quarterly' ? `
     <h2>Récapitulatif par mois</h2>
     <table>
       <tr><th>Mois</th><th>Nb ventes</th><th class="right">Espèces</th><th class="right">Carte</th><th class="right">Total</th></tr>
-      \${Object.entries(parMois).map(([mois,d])=>`
+      ${Object.entries(parMois).map(([mois,d])=>`
         <tr>
-          <td>\${new Date(mois+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</td>
-          <td>\${d.nb}</td>
-          <td class="right">\${d.esp.toFixed(2)}€</td>
-          <td class="right">\${d.carte.toFixed(2)}€</td>
-          <td class="right"><b>\${(d.esp+d.carte).toFixed(2)}€</b></td>
+          <td>${new Date(mois+'-15').toLocaleDateString('fr-BE',{month:'long',year:'numeric'})}</td>
+          <td>${d.nb}</td>
+          <td class="right">${d.esp.toFixed(2)}€</td>
+          <td class="right">${d.carte.toFixed(2)}€</td>
+          <td class="right"><b>${(d.esp+d.carte).toFixed(2)}€</b></td>
         </tr>`).join('')}
-      <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">\${totalEsp.toFixed(2)}€</td><td class="right">\${totalCarte.toFixed(2)}€</td><td class="right">\${totalTTC.toFixed(2)}€</td></tr>
+      <tr class="total-row"><td colspan="2">TOTAL</td><td class="right">${totalEsp.toFixed(2)}€</td><td class="right">${totalCarte.toFixed(2)}€</td><td class="right">${totalTTC.toFixed(2)}€</td></tr>
     </table>` : ''}
     <p style="color:#888;font-size:10px;margin-top:30px">Munchy's Candy · Société Kalice TVA BE 0750.497.413 · Export comptable ${label}</p>
     <script>setTimeout(()=>window.print(),500);</script>
