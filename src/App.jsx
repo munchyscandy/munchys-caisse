@@ -1310,7 +1310,7 @@ export default function App() {
               <button style={{...S.payBtn,...S.payCard,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('payment')} disabled={!cart.length}>💳 CARTE</button>
               <button style={{...S.payBtn,...S.payCash,padding:'10px 4px',fontSize:12}} onClick={()=>cart.length>0&&setModal('cash')} disabled={!cart.length}>💵 ESPÈCES</button>
             </div>
-            <button style={{width:'100%',padding:'6px',borderRadius:8,border:'1px solid rgba(255,255,255,0.3)',background:'rgba(255,255,255,0.1)',color:'#fff',fontWeight:700,fontSize:11,cursor:'pointer',display:cart.length>0?'block':'none'}} onClick={()=>cart.length>0&&setModal('splitStart')}>💳+💵 Paiement mixte</button>
+
             <div style={{display:'flex',gap:5}}>
               <button style={{...S.remiseBtn,padding:'7px 6px',fontSize:11}} onClick={()=>{setDiscountInput('');setModal('discount');}}>💸 Remise</button>
               {discount>0&&<button style={{...S.clearRemise,padding:'7px 8px',fontSize:11}} onClick={()=>setDiscount(0)}>✕</button>}
@@ -1415,13 +1415,19 @@ export default function App() {
                     onClick={()=>setShowExportModal(true)}>📥 Exporter</button>
                   <span style={{fontSize:12,color:'#888'}}>💳 <b style={{color:C1}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>{
                     if(v.paiement==='carte') return s+parseFloat(v.total||0);
-                    const m=v.paiement&&v.paiement.match(/carte: ([\d.]+)/);
-                    return m?s+parseFloat(m[1]):s;
+                    if(!v.paiement||!v.paiement.includes('mixte')) return s;
+                    let tot=0;
+                    const matches=[...v.paiement.matchAll(/carte: ([\d.]+)/g)];
+                    matches.forEach(m=>{ tot+=parseFloat(m[1]); });
+                    return s+tot;
                   },0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>💵 <b style={{color:C2}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>{
                     if(v.paiement==='espèces') return s+parseFloat(v.total||0);
-                    const m=v.paiement&&v.paiement.match(/espèces: ([\d.]+)/);
-                    return m?s+parseFloat(m[1]):s;
+                    if(!v.paiement||!v.paiement.includes('mixte')) return s;
+                    let tot=0;
+                    const matches=[...v.paiement.matchAll(/espèces: ([\d.]+)/g)];
+                    matches.forEach(m=>{ tot+=parseFloat(m[1]); });
+                    return s+tot;
                   },0).toFixed(2)}€</b></span>
                   <span style={{fontSize:12,color:'#888'}}>Total: <b style={{color:'#fff'}}>{displayVentes.filter(v=>!v.annulee).reduce((s,v)=>s+parseFloat(v.total||0),0).toFixed(2)}€</b></span>
                 </div>
@@ -1433,8 +1439,8 @@ export default function App() {
                       <div key={v.id} style={{...S.sItem,flexDirection:'column',alignItems:'flex-start',gap:4,opacity:v.annulee?0.4:1}}>
                         <div style={{display:'flex',justifyContent:'space-between',width:'100%',alignItems:'center'}}>
                           <div>
-                            <span style={{fontWeight:800,fontSize:15,color:v.paiement==='carte'?C1:C2}}>
-                              {v.paiement==='carte'?'💳':'💵'} {parseFloat(v.total).toFixed(2)}€
+                            <span style={{fontWeight:800,fontSize:15,color:v.paiement==='carte'?C1:v.paiement==='espèces'?C2:'#ff9800'}}>
+                              {v.paiement==='carte'?'💳':v.paiement==='espèces'?'💵':'💳+💵'} {parseFloat(v.total).toFixed(2)}€
                             </span>
                             {v.client_nom&&<span style={{fontSize:12,color:'#aaa',marginLeft:10}}>👤 {v.client_nom}</span>}
                             {v.annulee&&<span style={{fontSize:11,color:'#ff5555',marginLeft:8}}>⛔ ANNULÉE</span>}
@@ -2129,9 +2135,11 @@ export default function App() {
           <div style={S.mBtns}>
             <button style={S.btnCancel} onClick={()=>setModal('splitReste')}>← Retour</button>
             <button style={S.btnConfirm} onClick={async()=>{
-              const second = splitMethod.includes('→carte')?'carte':'espèces';
-              const first = splitMethod.split('→')[0];
-              await handlePayment('mixte '+first+'+'+second+' ('+first+': '+splitPaid.toFixed(2)+'€, '+second+': '+(finalTotal-splitPaid).toFixed(2)+'€)');
+              const second = splitMethod&&splitMethod.includes('→carte')?'carte':'espèces';
+              const first = splitMethod?splitMethod.split('→')[0]:'';
+              // Si même mode des 2 côtés → enregistrer comme paiement simple
+              const method = (first===second) ? second : ('mixte '+first+'+'+second+' ('+first+': '+splitPaid.toFixed(2)+'€, '+second+': '+(finalTotal-splitPaid).toFixed(2)+'€)');
+              await handlePayment(method);
               setSplitPaid(0);setSplitMethod(null);setMontantDonne('');
             }}>✅ Paiement reçu — {fmt(finalTotal-splitPaid)}</button>
           </div>
