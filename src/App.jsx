@@ -2108,10 +2108,10 @@ export default function App() {
           </div>
           <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:12,fontWeight:700}}>Comment payer le reste ?</p>
           <div style={{display:'flex',gap:10,marginBottom:12}}>
-            <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→carte');setMontantDonne(fmt(finalTotal-splitPaid).replace(',','.'').replace('€','').trim());setModal('splitConfirm');}}>
+            <button style={{...S.payBtn,...S.payCard,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→carte');setModal('splitConfirm');}}>
               💳 Carte<br/><b>{fmt(finalTotal-splitPaid)}</b>
             </button>
-            <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→espèces');setMontantDonne(fmt(finalTotal-splitPaid).replace(',','.').replace('€','').trim());setModal('splitConfirm');}}>
+            <button style={{...S.payBtn,...S.payCash,flex:1,padding:'14px',fontSize:13}} onClick={()=>{setSplitMethod(splitMethod+'→espèces');setModal('splitConfirm');}}>
               💵 Espèces<br/><b>{fmt(finalTotal-splitPaid)}</b>
             </button>
           </div>
