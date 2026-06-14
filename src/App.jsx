@@ -54,6 +54,7 @@ export default function App() {
   const [splitPaid, setSplitPaid] = useState(0); // montant déjà payé (paiement mixte)
   const [splitMethod, setSplitMethod] = useState(null); // 'carte' ou 'espèces'
   const [pendingTickets, setPendingTickets] = useState([]); // tickets en attente
+  const [cancelChoice, setCancelChoice] = useState(null); // vente en cours d'annulation
   const [showPending, setShowPending] = useState(false);
   const [testVentes, setTestVentes] = useState([]);
   const [exportDateFrom, setExportDateFrom] = useState(new Date().toISOString().split('T')[0].slice(0,7)+'-01');
@@ -1128,6 +1129,27 @@ export default function App() {
       }
     }catch(e){alert("❌ Erreur réseau: "+e.message);}
   };
+  // SUPPRIMER VENTE - retrait total, n'apparaît jamais dans le journal comptable
+  const supprimerVenteSansJournal = async (id) => {
+    if(testMode){
+      setTestVentes(prev=>prev.filter(v=>v.id!==id));
+      alert("✅ Vente test supprimée (non comptable) !");
+      return;
+    }
+    try{
+      const r=await fetch(`${SUPABASE_URL}/rest/v1/ventes?id=eq.${id}`,{
+        method:'DELETE',
+        headers:SB
+      });
+      if(r.ok){
+        alert("✅ Vente supprimée — n'apparaîtra pas dans le journal !");
+        loadVentes(journalDate);
+      } else {
+        const err=await r.text();
+        alert("❌ Erreur "+r.status+": "+err);
+      }
+    }catch(e){alert("❌ Erreur réseau: "+e.message);}
+  };
 
   // Recherche Open Food Facts si produit non trouvé localement
   const lookupBarcode = async (code) => {
@@ -1448,11 +1470,7 @@ export default function App() {
                           <div style={{display:'flex',gap:6,alignItems:'center'}}>
                             <span style={{fontSize:11,color:'#555'}}>{new Date(v.date_heure).toLocaleTimeString('fr-BE',{hour:'2-digit',minute:'2-digit'})}</span>
                             {!v.annulee&&(
-                              <button style={S.delBtn} onClick={()=>{
-                                const motif=prompt("Motif d'annulation (obligatoire) :");
-                                if(motif!==null&&motif.trim()) annulerVente(v.id,motif);
-                                else if(motif!==null) alert("Le motif est obligatoire !");
-                              }}>⛔</button>
+                              <button style={S.delBtn} onClick={()=>setCancelChoice(v)}>⛔</button>
                             )}
                           </div>
                         </div>
@@ -2069,6 +2087,37 @@ export default function App() {
 
       {/* Douchette: géré via searchRef ci-dessus */}
 
+      {/* CHOIX ANNULATION VENTE */}
+      {cancelChoice&&(
+        <div style={S.overlay}><div style={S.modal}>
+          <h2 style={S.mTitle}>⛔ Annuler ce ticket</h2>
+          <div style={{background:'rgba(211,81,139,0.08)',borderRadius:12,padding:'12px',marginBottom:16,textAlign:'center'}}>
+            <div style={{fontSize:24,fontWeight:900,color:'#D3518B'}}>{parseFloat(cancelChoice.total).toFixed(2)}€</div>
+            <div style={{fontSize:12,color:'#888'}}>{cancelChoice.paiement}</div>
+          </div>
+          <p style={{color:'#555',fontSize:13,textAlign:'center',marginBottom:16,fontWeight:700}}>Comment annuler ce ticket ?</p>
+          <div style={{display:'flex',flexDirection:'column',gap:10,marginBottom:12}}>
+            <button style={{...S.btnConfirm,padding:'14px',textAlign:'left'}} onClick={()=>{
+              const motif=prompt("Motif d'annulation (obligatoire) :");
+              if(motif!==null&&motif.trim()){ annulerVente(cancelChoice.id,motif); setCancelChoice(null); }
+              else if(motif!==null) alert("Le motif est obligatoire !");
+            }}>
+              📋 Notifier le journal de bord<br/>
+              <span style={{fontSize:11,opacity:0.85}}>Annulation visible par le comptable, avec motif</span>
+            </button>
+            <button style={{...S.btnConfirm,padding:'14px',textAlign:'left',background:'linear-gradient(135deg,#888,#555)'}} onClick={()=>{
+              if(confirm("Supprimer ce ticket SANS le notifier au journal comptable ?\n\nÀ utiliser uniquement pour des tests ou erreurs de manipulation.")){
+                supprimerVenteSansJournal(cancelChoice.id);
+                setCancelChoice(null);
+              }
+            }}>
+              🧪 Ne pas notifier (test / erreur)<br/>
+              <span style={{fontSize:11,opacity:0.85}}>Supprimé définitivement, invisible pour le comptable</span>
+            </button>
+          </div>
+          <button style={S.btnCancel} onClick={()=>setCancelChoice(null)}>Fermer</button>
+        </div></div>
+      )}
       {/* TICKETS EN ATTENTE */}
       {showPending&&(
         <div style={S.overlay}>
